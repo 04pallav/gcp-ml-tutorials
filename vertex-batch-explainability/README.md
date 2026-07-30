@@ -2,10 +2,10 @@
 
 This GCP ML project focuses on **batch explainability for credit-risk scoring** on Vertex AI. You train a scikit-learn classifier, register it on Vertex, and run one batch job that returns a prediction and per-feature attributions for each row in BigQuery.
 
-- 🗃️ GCS is used to store the sample input data
-- 📊 BigQuery holds the batch input rows and the explanation output table
+- <img width="18" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs.png"> GCS is used to store the sample input data
+- <img width="18" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/bigquery.png"> BigQuery holds the batch input rows and the explanation output table
 - 🤖 Vertex AI uploads the model and runs batch prediction with explanations enabled
-- 📈 Looker Studio connects to the output table for dashboards
+- <img width="18" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/looker.png"> Looker Studio connects to the output table for dashboards
 
 These services work together to train the model, run batch explanations, and write results to BigQuery.
 
