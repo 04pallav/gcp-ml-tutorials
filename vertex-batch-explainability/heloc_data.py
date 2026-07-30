@@ -1,10 +1,11 @@
-"""FICO HELOC dataset (OpenML data_id=45023)."""
+"""FICO HELOC dataset (OpenML data_id=45023), vendored as heloc.csv."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from sklearn.datasets import fetch_openml
 
 FEATURE_NAMES = [
     "ExternalRiskEstimate",
@@ -31,9 +32,12 @@ FEATURE_NAMES = [
     "PercentTradesWBalance",
 ]
 
+TARGET_COLUMN = "RiskPerformance"
+DATA_PATH = Path(__file__).with_name("heloc.csv")
 
-def load_heloc():
-    df = fetch_openml(data_id=45023, as_frame=True, parser="auto").frame
+
+def load_heloc() -> tuple[pd.DataFrame, pd.Series]:
+    df = pd.read_csv(DATA_PATH)
     X = df[FEATURE_NAMES].replace([-7, -8, -9], np.nan)
-    y = (df["RiskPerformance"].astype(str) == "1").astype(int)
+    y = (df[TARGET_COLUMN].astype(str) == "1").astype(int)
     return X, y

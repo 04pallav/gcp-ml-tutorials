@@ -11,7 +11,7 @@ These services work together to train the model, run batch explanations, and wri
 
 # 🗃️ GCS
 
-Upload the provided `instances.csv` file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO HELOC dataset on OpenML](https://www.openml.org/d/45023) — two borrowers a lender might score and explain. Each row includes information such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent. The label is **good** (paid as agreed) vs **bad** (90+ days past due), the kind of payment-history and utilization picture banks review for home-equity credit lines.
+Upload the provided `instances.csv` file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO HELOC dataset on OpenML](https://www.openml.org/d/45023) — 10,000 borrowers a lender might score and explain. Each row includes information such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent. Training uses the full labeled `heloc.csv` in this repo (same source, 10k rows); batch input uses the feature columns in `instances.csv`.
 
 👩‍💻
 
@@ -29,7 +29,7 @@ The pipeline consists of the following steps:
 
 1. Command-line arguments are parsed to specify your GCP project, GCS bucket, and input file.
 2. `instances.csv` is read from your GCS bucket and loaded into the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
-3. The HELOC training data is downloaded from OpenML and a scikit-learn pipeline is trained (median imputer → standard scaler → logistic regression).
+3. The HELOC training data is read from `heloc.csv` and a scikit-learn pipeline is trained (median imputer → standard scaler → logistic regression).
 4. `model.joblib` and `feature_names.json` are uploaded to your GCS bucket.
 5. The model is registered on Vertex AI with explanation settings for all 22 input features.
 6. A batch prediction job reads from `heloc_batch_input`, scores each row, and writes predictions plus feature attributions to `heloc_batch_explanations`.
@@ -56,7 +56,7 @@ Open BigQuery and check the input table:
 SELECT * FROM `your-project-id.ml_explainability.heloc_batch_input` LIMIT 10;
 ```
 
-You should see 2 rows — one per sample borrower from `instances.csv`.
+You should see 10,000 rows from `instances.csv`.
 
 After the batch job finishes, open the output table:
 
@@ -68,7 +68,7 @@ Each row has a prediction and **feature attributions** — how much each input f
 
 # 🤖 Vertex AI
 
-Open **Vertex AI → Batch predictions** in the console. The job typically takes a few minutes on a two-row smoke test. Wait for **JOB_STATE_SUCCEEDED**.
+Open **Vertex AI → Batch predictions** in the console. The job typically takes several minutes on 10k rows. Wait for **JOB_STATE_SUCCEEDED**.
 
 ❗ If you see **"Machine type temporarily unavailable"**, retry with `--machine-type c2-standard-4`.
 
