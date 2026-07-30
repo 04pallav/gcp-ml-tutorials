@@ -2,65 +2,33 @@
 
 **By Pallav Anand**
 
-Code: [`code/vertex-batch-explainability/`](https://github.com/04pallav/gcp-ml-tutorials/tree/main/code/vertex-batch-explainability)
+This GCP ML project builds **batch explainability for credit-risk scoring** on Vertex AI. You train a scikit-learn classifier on the FICO HELOC dataset, register it with explanation metadata, and explain applicants in bulk — each row gets a prediction and per-feature attributions written back to BigQuery.
 
----
+🗃️ **Cloud Storage** — `model.joblib` and `feature_names.json`
 
-This tutorial walks through **Vertex AI batch explainability** on a credit-risk use case. You train a scikit-learn classifier on the **FICO HELOC** dataset, register it on Vertex with explanation metadata, and run **`Model.batch_predict(..., generate_explanation=True)`** so every row gets a prediction **and** per-feature attributions — reading from **BigQuery** and writing results back to **BigQuery**.
+📊 **BigQuery** — batch input table and explanation output table
 
-That is the pattern you want when explanations must scale: compliance reviews, model monitoring, or offline analysis across thousands of applicants — without calling `endpoint.explain()` row by row.
+🤖 **Vertex AI** — model upload + batch prediction with explanations
 
-**Stack:** Cloud Storage (model artifacts) · BigQuery (batch I/O) · Vertex AI Model + Explainable AI
+📈 **Looker Studio** (optional) — dashboards on attribution results
 
-> This tutorial uses **Vertex AI batch prediction with explanations**. It is not the open-source `shap` package, not Beam/Dataflow custom explainers, and not online-only `endpoint.explain()`.
+These services work together to score and explain credit-risk applications at scale — without calling `endpoint.explain()` row by row.
 
----
+Find the code on GitHub:
 
-## 🎯 What is batch explainability?
-
-**Online explain:** deploy a model to an endpoint, call `explain()` per request. Fine for a few rows; expensive at scale.
-
-**Batch explain:** register explanation metadata once, then run `batch_predict` with `generate_explanation=True`. Vertex scores every row and returns **feature attributions** in the same job output.
+[github.com/04pallav/gcp-ml-tutorials](https://github.com/04pallav/gcp-ml-tutorials/tree/main/code/vertex-batch-explainability)
 
 ---
 
 ## 📋 The HELOC dataset
 
-We use the **Home Equity Line of Credit (HELOC)** dataset from OpenML — 22 numeric features and a good/bad credit-risk label. `instances.json` ships with two sample applicants for a cheap smoke test.
+We use the **Home Equity Line of Credit (HELOC)** dataset from OpenML — a binary credit-risk benchmark with **22 numeric features** (payment history, utilization, inquiries, etc.) and a good/bad label.
+
+`instances.json` in the repo has **two sample applicants** for a cheap smoke test. In production, your BigQuery input table holds the same feature columns for the population you need to explain.
 
 ---
 
-## 🏗️ Architecture
-
-```
-instances.json
-      │
-      ├─ train_model.py ──► model.joblib ──► GCS
-      │
-      └─ prepare_bq_input.py ──► BigQuery input table
-                                      │
-              Model.upload(explanation_metadata=…)
-                                      │
-              Model.batch_predict(generate_explanation=True)
-                                      │
-                              BigQuery output table
-```
-
----
-
-## 📦 Repo layout
-
-| File | Purpose |
-|---|---|
-| `config.example.json` | Project, bucket, BQ tables |
-| `train_model.py` | Train sklearn pipeline locally |
-| `prepare_bq_input.py` | Load `instances.json` → BigQuery |
-| `run_batch_explain.py` | Upload model + batch explain job |
-| `instances.json` | Two sample applicants |
-
----
-
-## 👩‍💻 Step 1: Clone and configure
+## 👩‍💻 Step 1: Clone the repo and set your project
 
 ```bash
 git clone https://github.com/04pallav/gcp-ml-tutorials.git
@@ -89,7 +57,7 @@ Edit `config.local.json` — set `project_id` and `staging_bucket_uri`:
 }
 ```
 
-Enable APIs and auth:
+Set the project in Cloud Shell (or locally):
 
 ```bash
 gcloud config set project YOUR_GCP_PROJECT_ID
@@ -103,15 +71,21 @@ Your service account needs `roles/aiplatform.user`, `roles/storage.objectAdmin` 
 
 ---
 
-## 🐝 Step 2: Train and load BigQuery input
+## 🐝 Step 2: Train the model
 
-Train locally (optional sanity check):
+Train locally — Vertex serves this exact `model.joblib`:
 
 ```bash
 python train_model.py
 ```
 
-Load sample rows into BigQuery:
+The pipeline is median imputer → standard scaler → logistic regression. Outputs land in `models/model.joblib` and `models/feature_names.json`.
+
+---
+
+## 📊 Step 3: Load batch input into BigQuery
+
+Load the two sample rows into your input table:
 
 ```bash
 python prepare_bq_input.py
@@ -123,11 +97,11 @@ Confirm in BigQuery Console:
 SELECT * FROM `YOUR_GCP_PROJECT_ID.ml_explainability.heloc_batch_input` LIMIT 10;
 ```
 
-Column names must match `feature_names.json` exactly — they become the `inputs` map in Vertex `ExplanationMetadata`.
+❗ Column names must match `feature_names.json` exactly — they become the `inputs` map in Vertex `ExplanationMetadata`.
 
 ---
 
-## 🚀 Step 3: Run batch explain
+## 🚀 Step 4: Run the batch explain job
 
 One command trains, uploads the model with explanation metadata, and starts the batch job:
 
@@ -135,26 +109,15 @@ One command trains, uploads the model with explanation metadata, and starts the 
 python run_batch_explain.py
 ```
 
-`run_batch_explain.py` registers the model with sampled Shapley attribution config, then calls:
-
-```python
-model.batch_predict(
-    instances_format="bigquery",
-    bigquery_source="bq://PROJECT.DATASET.INPUT_TABLE",
-    predictions_format="bigquery",
-    bigquery_destination_prefix="bq://PROJECT.DATASET.OUTPUT_TABLE",
-    generate_explanation=True,
-    ...
-)
-```
+Unlike online `endpoint.explain()` (one row at a time), batch explain registers metadata once and runs `batch_predict` with `generate_explanation=True` — Vertex returns **feature attributions** alongside predictions in the output table.
 
 Open **Vertex AI → Batch predictions** and wait for **`JOB_STATE_SUCCEEDED`**. A two-row smoke job typically takes a few minutes.
 
-If you see **"Machine type temporarily unavailable"**, switch `machine_type` in config (e.g. `c2-standard-4`) and retry.
+❗ If you see **"Machine type temporarily unavailable"**, switch `machine_type` in config (e.g. `c2-standard-4`) and retry.
 
 ---
 
-## 📈 Step 4: Read results
+## 📈 Step 5: Read results in BigQuery
 
 ```sql
 SELECT *
@@ -162,7 +125,7 @@ FROM `YOUR_GCP_PROJECT_ID.ml_explainability.heloc_batch_explanations`
 LIMIT 10;
 ```
 
-Vertex writes predictions and **`featureAttributions`** per row. Positive attribution → feature pushed the score up; negative → pushed it down.
+Each row includes predictions and **`featureAttributions`**. Positive attribution → feature pushed the score up; negative → pushed it down.
 
 Connect **Looker Studio** to the output table for stakeholder dashboards.
 
@@ -190,6 +153,6 @@ Connect **Looker Studio** to the output table for stakeholder dashboards.
 
 ## Wrapping up
 
-You now have an end-to-end **Vertex AI batch explainability** flow: train a sklearn credit-risk model, stage it on Vertex with explanation metadata, score and explain rows from BigQuery in one job, and inspect attributions in BigQuery or Looker.
+You now have an end-to-end Vertex AI batch explainability flow: train a sklearn credit-risk model, stage it on Vertex, score and explain rows from BigQuery in one job, and inspect attributions in BigQuery or Looker.
 
 **Tags:** Vertex AI · Vertex Explainable AI · MLOps · BigQuery · scikit-learn · Google Cloud
