@@ -1,11 +1,11 @@
-# ☁️ GCP ML Explainability: Batch Credit-Risk Scoring with Vertex AI, BigQuery and scikit-learn 🔍
+# <img width="40" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcp.png"> GCP ML Explainability: Batch Credit-Risk Scoring with Vertex AI, BigQuery and scikit-learn
 
 This GCP ML project focuses on **batch explainability for credit-risk scoring** on Vertex AI. You train a scikit-learn classifier, register it on Vertex, and run one batch job that returns a prediction and per-feature attributions for each row in BigQuery.
 
-- 🗃️ GCS is used to store the sample input data
-- 📊 BigQuery holds the batch input rows and the explanation output table
-- 🤖 Vertex AI uploads the model and runs batch prediction with explanations enabled
-- 📈 Looker Studio connects to the output table for dashboards
+- <img width="18" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs.png"> GCS is used to store the sample input data
+- <img width="18" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/bigquery.png"> BigQuery holds the batch input rows and the explanation output table
+- <img width="18" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/vertex-ai.png"> Vertex AI uploads the model and runs batch prediction with explanations enabled
+- <img width="18" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/looker.png"> Looker Studio connects to the output table for dashboards
 
 These services work together to train the model, run batch explanations, and write results to BigQuery.
 
@@ -13,13 +13,13 @@ Find the code and CSV file on my github account.
 
 [github.com/04pallav/gcp-ml-tutorials/vertex-batch-explainability](https://github.com/04pallav/gcp-ml-tutorials/tree/main/vertex-batch-explainability)
 
-# 🗃️ GCS
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs.png"> GCS
 
 Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO HELOC dataset on OpenML](https://www.openml.org/d/45023) — 10,000 borrowers a lender might score and explain. It includes information such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent. The data showcases various credit-risk scenarios, providing valuable insights into payment history and utilization patterns banks review for home-equity credit lines.
 
 ![image](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs-upload-instances.png)
 
-# 🐝 `batch_explain.py`
+# `batch_explain.py`
 
 📖
 
@@ -49,7 +49,7 @@ Give the batch_explain.py code a test run in the shell and then check the result
 
 ❗ Make sure that all your files and services are in the same location. E.g. both buckets should be in the same location or you will get a similar error message: ‘Cannot read and write in different locations: source: US, destination: EU’
 
-# 📊 BigQuery
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/bigquery.png"> BigQuery
 
 Open BigQuery and check the input table:
 
@@ -67,11 +67,11 @@ SELECT * FROM `your-project-id.ml_explainability.heloc_batch_explanations` LIMIT
 
 Each row has a prediction and **feature attributions** — how much each input feature pushed the score up or down for that borrower.
 
-# 🤖 Vertex AI
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/vertex-ai.png"> Vertex AI
 
 Open **Vertex AI → Batch predictions** in the console. Wait for **JOB_STATE_SUCCEEDED**.
 
-# 📈 Looker Studio
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/looker.png"> Looker Studio
 
 Connect Looker Studio to `heloc_batch_explanations` and build a bar chart of top attributions per borrower.
 
