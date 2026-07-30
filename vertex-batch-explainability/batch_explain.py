@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import json
 import os
 import tempfile
@@ -21,17 +23,20 @@ from heloc_data import FEATURE_NAMES, load_heloc
 SERVING_CONTAINER = "us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-6:latest"
 
 
-def read_instances_json(path: str) -> list[dict]:
+def read_instances_csv(path: str) -> list[dict]:
     if path.startswith("gs://"):
         bucket_name, _, blob_name = path.removeprefix("gs://").partition("/")
         raw = storage.Client().bucket(bucket_name).blob(blob_name).download_as_text()
-        return json.loads(raw)["instances"]
-    with open(path) as f:
-        return json.load(f)["instances"]
+        reader = csv.DictReader(io.StringIO(raw))
+    else:
+        with open(path, newline="") as f:
+            reader = csv.DictReader(f)
+    rows = list(reader)
+    return [{name: float(row[name]) for name in FEATURE_NAMES} for row in rows]
 
 
 def load_instances_to_bq(project_id: str, dataset: str, table: str, instances_path: str) -> str:
-    instances = read_instances_json(instances_path)
+    instances = read_instances_csv(instances_path)
     table_id = f"{project_id}.{dataset}.{table}"
     client = bigquery.Client(project=project_id)
     client.create_dataset(f"{project_id}.{dataset}", exists_ok=True)
@@ -130,7 +135,7 @@ def main() -> None:
     parser.add_argument("--project-id", required=True)
     parser.add_argument("--bucket-uri", required=True, help="e.g. gs://your-bucket/vertex-batch-explain")
     parser.add_argument("--region", default="us-central1")
-    parser.add_argument("--instances", default="instances.json")
+    parser.add_argument("--instances", default="instances.csv", help="local path or gs:// URI")
     parser.add_argument("--dataset", default="ml_explainability")
     parser.add_argument("--input-table", default="heloc_batch_input")
     parser.add_argument("--output-table", default="heloc_batch_explanations")

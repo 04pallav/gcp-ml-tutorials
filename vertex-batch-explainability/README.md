@@ -11,11 +11,11 @@ These services work together to train the model, run batch explanations, and wri
 
 # 🗃️ GCS
 
-Upload the provided `instances.json` file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO HELOC dataset on OpenML](https://www.openml.org/d/45023) — two borrowers a lender might score and explain. Each row includes information such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent. The label is **good** (paid as agreed) vs **bad** (90+ days past due), the kind of payment-history and utilization picture banks review for home-equity credit lines.
+Upload the provided `instances.csv` file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO HELOC dataset on OpenML](https://www.openml.org/d/45023) — two borrowers a lender might score and explain. Each row includes information such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent. The label is **good** (paid as agreed) vs **bad** (90+ days past due), the kind of payment-history and utilization picture banks review for home-equity credit lines.
 
 👩‍💻
 
-Upload from Cloud Shell: `gcloud storage cp instances.json gs://your-bucket/instances.json`
+Upload from Cloud Shell: `gcloud storage cp instances.csv gs://your-bucket/instances.csv`
 
 ❗ Keep the bucket in the same region as Vertex and BigQuery (e.g. `us-central1`).
 
@@ -28,7 +28,7 @@ Upload from Cloud Shell: `gcloud storage cp instances.json gs://your-bucket/inst
 The pipeline consists of the following steps:
 
 1. Command-line arguments are parsed to specify your GCP project, GCS bucket, and input file.
-2. `instances.json` is read from your GCS bucket and loaded into the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
+2. `instances.csv` is read from your GCS bucket and loaded into the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
 3. The HELOC training data is downloaded from OpenML and a scikit-learn pipeline is trained (median imputer → standard scaler → logistic regression).
 4. `model.joblib` and `feature_names.json` are uploaded to your GCS bucket.
 5. The model is registered on Vertex AI with explanation settings for all 22 input features.
@@ -42,7 +42,7 @@ Enable APIs: `gcloud services enable aiplatform.googleapis.com storage.googleapi
 
 Install dependencies: `pip install -r requirements.txt`
 
-Run the pipeline: `python batch_explain.py --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain --instances gs://your-bucket/instances.json`
+Run the pipeline: `python batch_explain.py --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain --instances gs://your-bucket/instances.csv`
 
 ❗ Train with sklearn **1.6.x** (pinned in `requirements.txt`) and serve with the `sklearn-cpu.1-6` container.
 
@@ -56,7 +56,7 @@ Open BigQuery and check the input table:
 SELECT * FROM `your-project-id.ml_explainability.heloc_batch_input` LIMIT 10;
 ```
 
-You should see 2 rows — one per sample borrower from `instances.json`.
+You should see 2 rows — one per sample borrower from `instances.csv`.
 
 After the batch job finishes, open the output table:
 
