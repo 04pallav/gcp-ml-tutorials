@@ -21,9 +21,17 @@ from heloc_data import FEATURE_NAMES, load_heloc
 SERVING_CONTAINER = "us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-6:latest"
 
 
+def read_instances_json(path: str) -> list[dict]:
+    if path.startswith("gs://"):
+        bucket_name, _, blob_name = path.removeprefix("gs://").partition("/")
+        raw = storage.Client().bucket(bucket_name).blob(blob_name).download_as_text()
+        return json.loads(raw)["instances"]
+    with open(path) as f:
+        return json.load(f)["instances"]
+
+
 def load_instances_to_bq(project_id: str, dataset: str, table: str, instances_path: str) -> str:
-    with open(instances_path) as f:
-        instances = json.load(f)["instances"]
+    instances = read_instances_json(instances_path)
     table_id = f"{project_id}.{dataset}.{table}"
     client = bigquery.Client(project=project_id)
     client.create_dataset(f"{project_id}.{dataset}", exists_ok=True)

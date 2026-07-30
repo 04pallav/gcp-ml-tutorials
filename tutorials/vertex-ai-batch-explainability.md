@@ -4,7 +4,7 @@
 
 This GCP ML project focuses on **batch explainability for credit-risk scoring** on Vertex AI. You train a scikit-learn classifier, register it on Vertex, and run one batch job that returns a prediction and per-feature attributions for each row in BigQuery.
 
-🗃️GCS is used to store the trained `model.joblib` before Vertex registers it
+🗃️GCS is used to store the sample input data
 
 📊BigQuery holds the batch input rows and the explanation output table
 
@@ -20,9 +20,13 @@ Find the code on my GitHub account.
 
 🗃️GCS
 
-Create a Cloud Storage bucket in the same region you will use for Vertex and BigQuery (e.g. `us-central1`). The script uploads `model.joblib` and `feature_names.json` here before registering the model on Vertex.
+Upload the provided `instances.json` file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO HELOC dataset on OpenML](https://www.openml.org/d/45023) — two borrowers a lender might score and explain. Each row includes information such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent. The label is **good** (paid as agreed) vs **bad** (90+ days past due), the kind of payment-history and utilization picture banks review for home-equity credit lines.
 
-The repo includes `instances.json` with **two sample borrowers** from the [FICO HELOC dataset on OpenML](https://www.openml.org/d/45023). A HELOC (Home Equity Line of Credit) is a loan homeowners draw on using home equity — banks track payment history, utilization, and inquiries to monitor risk. Each row has **22 numeric features**, for example `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq`. The model predicts **good** (paid as agreed) vs **bad** (90+ days past due).
+👩‍💻
+
+Upload from Cloud Shell: `gcloud storage cp instances.json gs://your-bucket/instances.json`
+
+❗ Keep the bucket in the same region as Vertex and BigQuery (e.g. `us-central1`).
 
 🐝batch_explain.py
 
@@ -36,7 +40,7 @@ The pipeline consists of the following steps:
 
 Command-line arguments are parsed to specify your GCP project and GCS bucket.
 
-`instances.json` is loaded into the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
+`instances.json` is read from your GCS bucket and loaded into the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
 
 The HELOC training data is downloaded from OpenML and a scikit-learn pipeline is trained (median imputer → standard scaler → logistic regression).
 
@@ -54,7 +58,7 @@ Enable APIs: `gcloud services enable aiplatform.googleapis.com storage.googleapi
 
 Clone the repo and install dependencies: `git clone https://github.com/04pallav/gcp-ml-tutorials.git && cd gcp-ml-tutorials/code/vertex-batch-explainability && pip install -r requirements.txt`
 
-Run the pipeline: `python batch_explain.py --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain`
+Run the pipeline: `python batch_explain.py --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain --instances gs://your-bucket/instances.json`
 
 ❗ Train with sklearn **1.6.x** (pinned in `requirements.txt`) and serve with the `sklearn-cpu.1-6` container.
 
