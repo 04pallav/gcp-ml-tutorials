@@ -2,7 +2,7 @@
 
 Public tutorials and runnable code for Google Cloud Machine Learning.
 
-## Vertex AI Batch Explainability
+## GCP ML Explainability
 
 **Tutorial + code:** [vertex-batch-explainability/](vertex-batch-explainability/)
 
