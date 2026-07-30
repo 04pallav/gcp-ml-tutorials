@@ -2,7 +2,7 @@
 
 **By Pallav Anand**
 
-This GCP ML project builds **batch explainability for credit-risk scoring** on Vertex AI. You train a scikit-learn classifier on the FICO HELOC dataset, register it with explanation metadata, and explain applicants in bulk — each row gets a prediction and per-feature attributions written back to BigQuery.
+This GCP ML project builds **batch explainability for credit-risk scoring** on Vertex AI. You train a scikit-learn classifier on a public lending dataset, register it with explanation metadata, and explain applicants in bulk — each row gets a prediction and per-feature attributions written back to BigQuery.
 
 🗃️ **Cloud Storage** — `model.joblib` and `feature_names.json`
 
@@ -20,11 +20,21 @@ Find the code on GitHub:
 
 ---
 
-## 📋 The HELOC dataset
+## 📋 The dataset
 
-We use the **Home Equity Line of Credit (HELOC)** dataset from OpenML — a binary credit-risk benchmark with **22 numeric features** (payment history, utilization, inquiries, etc.) and a good/bad label.
+**What is a HELOC?** A **Home Equity Line of Credit** is a loan homeowners can draw on using their home equity — similar to a credit card, but secured by the house. Banks use credit scores and payment history to decide approvals and to monitor risk over time.
 
-`instances.json` in the repo has **two sample applicants** for a cheap smoke test. In production, your BigQuery input table holds the same feature columns for the population you need to explain.
+**What we're using:** The [FICO HELOC dataset on OpenML](https://www.openml.org/d/45023) — a public benchmark FICO released for teaching credit-risk models. Each row is one borrower. The label is **good** (paid as agreed) vs **bad** (90+ days past due within 24 months).
+
+The data has **22 numeric features** lenders care about, for example:
+
+- `ExternalRiskEstimate` — outside risk score
+- `NumInqLast6M` — how many times the borrower applied for credit recently
+- `NetFractionRevolvingBurden` — how much of their revolving credit limit is in use
+- `MSinceMostRecentDelq` — months since the most recent delinquency
+- `PercentTradesNeverDelq` — share of accounts never delinquent
+
+`instances.json` in the repo has **two sample borrowers** for a cheap smoke test. In production, your BigQuery input table would hold the same kind of columns for the population you need to explain.
 
 ---
 
