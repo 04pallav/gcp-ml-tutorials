@@ -38,50 +38,36 @@ The data has **22 numeric features** lenders care about, for example:
 
 ---
 
-## 👩‍💻 Step 1: Clone the repo and set your project
+## 🗃️ Step 1: Create a staging bucket
+
+Create a Cloud Storage bucket in the same region you will use for Vertex and BigQuery (e.g. `us-central1`). The scripts upload `model.joblib` here before registering the model on Vertex.
+
+Example path: `gs://your-bucket/vertex-batch-explain`
+
+---
+
+## 👩‍💻 Step 2: Cloud Shell setup
+
+Open [Cloud Shell](https://shell.cloud.google.com/) and run:
 
 ```bash
+gcloud config set project your-project-id
+gcloud services enable aiplatform.googleapis.com storage.googleapis.com bigquery.googleapis.com
+
 git clone https://github.com/04pallav/gcp-ml-tutorials.git
 cd gcp-ml-tutorials/code/vertex-batch-explainability
-python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 cp config.example.json config.local.json
 ```
 
-Edit `config.local.json` — set `project_id` and `staging_bucket_uri`:
-
-```json
-{
-  "project_id": "YOUR_GCP_PROJECT_ID",
-  "region": "us-central1",
-  "staging_bucket_uri": "gs://YOUR_BUCKET/vertex-batch-explain",
-  "display_name": "heloc-batch-explain",
-  "job_name": "heloc-batch-explain-job",
-  "bq_dataset": "ml_explainability",
-  "bq_input_table": "heloc_batch_input",
-  "bq_output_table": "heloc_batch_explanations",
-  "serving_container": "us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-6:latest",
-  "machine_type": "n2-standard-4",
-  "batch_size": 16
-}
-```
-
-Set the project in Cloud Shell (or locally):
-
-```bash
-gcloud config set project YOUR_GCP_PROJECT_ID
-gcloud services enable aiplatform.googleapis.com storage.googleapis.com bigquery.googleapis.com
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/your-service-account.json
-```
-
-Your service account needs `roles/aiplatform.user`, `roles/storage.objectAdmin` on the bucket, and `roles/bigquery.dataEditor`.
+Edit `config.local.json` and replace **`your-project-id`** and **`gs://your-bucket/vertex-batch-explain`** with your values. The rest of the defaults are fine for the smoke test — see [`config.example.json`](https://github.com/04pallav/gcp-ml-tutorials/blob/main/code/vertex-batch-explainability/config.example.json) in the repo.
 
 ❗ Train with sklearn **1.6.x** and serve with `sklearn-cpu.1-6`. Keep bucket, Vertex, and BigQuery in the same region.
 
 ---
 
-## 🐝 Step 2: Train the model
+## 🐝 Step 3: Train the model
 
 Train locally — Vertex serves this exact `model.joblib`:
 
@@ -93,7 +79,7 @@ The pipeline is median imputer → standard scaler → logistic regression. Outp
 
 ---
 
-## 📊 Step 3: Load batch input into BigQuery
+## 📊 Step 4: Load batch input into BigQuery
 
 Load the two sample rows into your input table:
 
@@ -111,7 +97,7 @@ SELECT * FROM `YOUR_GCP_PROJECT_ID.ml_explainability.heloc_batch_input` LIMIT 10
 
 ---
 
-## 🚀 Step 4: Run the batch explain job
+## 🚀 Step 5: Run the batch explain job
 
 One command trains, uploads the model with explanation metadata, and starts the batch job:
 
@@ -127,7 +113,7 @@ Open **Vertex AI → Batch predictions** and wait for **`JOB_STATE_SUCCEEDED`**.
 
 ---
 
-## 📈 Step 5: Read results in BigQuery
+## 📈 Step 6: Read results in BigQuery
 
 ```sql
 SELECT *
