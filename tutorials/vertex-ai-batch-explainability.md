@@ -12,7 +12,7 @@ This GCP ML project builds **batch explainability for credit-risk scoring** on V
 
 📈 **Looker Studio** (optional) connects to the output table for dashboards
 
-These services work together to score and explain credit-risk applications at scale — without calling `endpoint.explain()` row by row.
+These services work together to score and explain credit-risk applications in bulk and write the results to BigQuery.
 
 Find the code on my GitHub account:
 
