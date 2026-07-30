@@ -2,7 +2,7 @@
 
 **By Pallav Anand**
 
-This GCP ML project builds **batch explainability for credit-risk scoring** on Vertex AI. You train a scikit-learn classifier on a public lending dataset, register it with explanation metadata, and explain applicants in bulk — each row gets a prediction and per-feature attributions written back to BigQuery.
+This GCP ML project builds **batch explainability for credit-risk scoring** on Vertex AI. You train a scikit-learn classifier on a public lending dataset, register it with explanation metadata, and run a batch explain job — each row gets a prediction and per-feature attributions in BigQuery.
 
 🗃️ **Cloud Storage** is used to store the trained `model.joblib` before Vertex registers it
 
@@ -12,7 +12,7 @@ This GCP ML project builds **batch explainability for credit-risk scoring** on V
 
 📈 **Looker Studio** (optional) connects to the output table for dashboards
 
-These services work together to score and explain credit-risk applications in bulk and write the results to BigQuery.
+These services work together to train the model, run batch explanations, and write results to BigQuery.
 
 Find the code on my GitHub account:
 
