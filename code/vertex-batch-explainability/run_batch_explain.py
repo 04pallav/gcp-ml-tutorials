@@ -18,10 +18,7 @@ from sklearn.preprocessing import StandardScaler
 
 from heloc_data import FEATURE_NAMES, load_heloc
 
-
-def load_config(path: str) -> dict:
-    with open(path) as f:
-        return json.load(f)
+SERVING_CONTAINER = "us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-6:latest"
 
 
 def train_model(output_dir: str) -> None:
@@ -59,7 +56,7 @@ def upload_dir_to_gcs(local_dir: str, bucket_uri: str, subdir: str) -> str:
     return f"gs://{bucket_name}/{dest_prefix}/"
 
 
-def upload_explainable_model(cfg: dict, artifact_uri: str):
+def upload_explainable_model(project_id: str, region: str, artifact_uri: str, display_name: str):
     explanation_parameters = aiplatform.explain.ExplanationParameters({
         "sampled_shapley_attribution": {"path_count": 10},
     })
@@ -68,9 +65,9 @@ def upload_explainable_model(cfg: dict, artifact_uri: str):
         outputs={"probability": {}},
     )
     model = aiplatform.Model.upload(
-        display_name=cfg["display_name"],
+        display_name=display_name,
         artifact_uri=artifact_uri,
-        serving_container_image_uri=cfg["serving_container"],
+        serving_container_image_uri=SERVING_CONTAINER,
         explanation_parameters=explanation_parameters,
         explanation_metadata=explanation_metadata,
     )
@@ -78,52 +75,68 @@ def upload_explainable_model(cfg: dict, artifact_uri: str):
     return model
 
 
-def run_batch_job(cfg: dict, model) -> None:
-    input_table = f"{cfg['project_id']}.{cfg['bq_dataset']}.{cfg['bq_input_table']}"
-    output_table = f"{cfg['project_id']}.{cfg['bq_dataset']}.{cfg['bq_output_table']}"
-    print(f"[vertex] batch input:  {input_table}", flush=True)
-    print(f"[vertex] batch output: {output_table}", flush=True)
+def run_batch_job(
+    model,
+    *,
+    project_id: str,
+    dataset: str,
+    input_table: str,
+    output_table: str,
+    job_name: str,
+    machine_type: str,
+    batch_size: int,
+) -> None:
+    bq_input = f"{project_id}.{dataset}.{input_table}"
+    bq_output = f"{project_id}.{dataset}.{output_table}"
+    print(f"[vertex] batch input:  {bq_input}", flush=True)
+    print(f"[vertex] batch output: {bq_output}", flush=True)
     job = model.batch_predict(
-        job_display_name=cfg["job_name"],
+        job_display_name=job_name,
         instances_format="bigquery",
-        bigquery_source=f"bq://{input_table}",
+        bigquery_source=f"bq://{bq_input}",
         predictions_format="bigquery",
-        bigquery_destination_prefix=f"bq://{output_table}",
+        bigquery_destination_prefix=f"bq://{bq_output}",
         generate_explanation=True,
-        machine_type=cfg.get("machine_type", "n2-standard-4"),
-        batch_size=cfg.get("batch_size", 16),
+        machine_type=machine_type,
+        batch_size=batch_size,
         starting_replica_count=1,
         max_replica_count=1,
     )
     print(f"[vertex] batch job: {job.resource_name}", flush=True)
 
 
-def model_artifact_uri(cfg: dict) -> str:
-    bucket, prefix = parse_gcs_uri(cfg["staging_bucket_uri"])
-    model_prefix = f"{prefix}/models" if prefix else "models"
-    return f"gs://{bucket}/{model_prefix}/"
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.local.json")
-    parser.add_argument("--skip-train", action="store_true", help="Reuse model.joblib already on GCS")
+    parser.add_argument("--project-id", required=True)
+    parser.add_argument("--region", default="us-central1")
+    parser.add_argument("--bucket-uri", required=True, help="e.g. gs://your-bucket/vertex-batch-explain")
+    parser.add_argument("--dataset", default="ml_explainability")
+    parser.add_argument("--input-table", default="heloc_batch_input")
+    parser.add_argument("--output-table", default="heloc_batch_explanations")
+    parser.add_argument("--display-name", default="heloc-batch-explain")
+    parser.add_argument("--job-name", default="heloc-batch-explain-job")
+    parser.add_argument("--machine-type", default="n2-standard-4")
+    parser.add_argument("--batch-size", type=int, default=16)
     args = parser.parse_args()
 
-    cfg = load_config(args.config)
-    aiplatform.init(project=cfg["project_id"], location=cfg["region"])
+    aiplatform.init(project=args.project_id, location=args.region)
 
-    if args.skip_train:
-        artifact_uri = model_artifact_uri(cfg)
-        print(f"[vertex] reusing artifacts at {artifact_uri}", flush=True)
-    else:
-        with tempfile.TemporaryDirectory() as tmp:
-            model_dir = os.path.join(tmp, "models")
-            train_model(model_dir)
-            artifact_uri = upload_dir_to_gcs(model_dir, cfg["staging_bucket_uri"], "models")
+    with tempfile.TemporaryDirectory() as tmp:
+        model_dir = os.path.join(tmp, "models")
+        train_model(model_dir)
+        artifact_uri = upload_dir_to_gcs(model_dir, args.bucket_uri, "models")
 
-    model = upload_explainable_model(cfg, artifact_uri)
-    run_batch_job(cfg, model)
+    model = upload_explainable_model(args.project_id, args.region, artifact_uri, args.display_name)
+    run_batch_job(
+        model,
+        project_id=args.project_id,
+        dataset=args.dataset,
+        input_table=args.input_table,
+        output_table=args.output_table,
+        job_name=args.job_name,
+        machine_type=args.machine_type,
+        batch_size=args.batch_size,
+    )
 
 
 if __name__ == "__main__":

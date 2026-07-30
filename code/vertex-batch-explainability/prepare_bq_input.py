@@ -9,28 +9,20 @@ from google.cloud import bigquery
 from heloc_data import FEATURE_NAMES
 
 
-def load_config(path):
-    with open(path) as f:
-        return json.load(f)
-
-
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.local.json")
+    parser.add_argument("--project-id", required=True)
+    parser.add_argument("--dataset", default="ml_explainability")
+    parser.add_argument("--table", default="heloc_batch_input")
     parser.add_argument("--instances", default="instances.json")
     args = parser.parse_args()
 
-    cfg = load_config(args.config)
     with open(args.instances) as f:
         instances = json.load(f)["instances"]
 
-    project_id = cfg["project_id"]
-    dataset = cfg["bq_dataset"]
-    table = cfg["bq_input_table"]
-    table_id = f"{project_id}.{dataset}.{table}"
-
-    client = bigquery.Client(project=project_id)
-    client.create_dataset(f"{project_id}.{dataset}", exists_ok=True)
+    table_id = f"{args.project_id}.{args.dataset}.{args.table}"
+    client = bigquery.Client(project=args.project_id)
+    client.create_dataset(f"{args.project_id}.{args.dataset}", exists_ok=True)
 
     rows = [{name: float(row[name]) for name in FEATURE_NAMES} for row in instances]
     schema = [bigquery.SchemaField(name, "FLOAT") for name in FEATURE_NAMES]

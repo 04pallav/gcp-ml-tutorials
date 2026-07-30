@@ -11,9 +11,10 @@ Public tutorials and runnable code for Google Cloud Machine Learning.
 ```bash
 git clone https://github.com/04pallav/gcp-ml-tutorials.git
 cd gcp-ml-tutorials/code/vertex-batch-explainability
-cp config.example.json config.local.json
 pip install -r requirements.txt
 python train_model.py
+python prepare_bq_input.py --project-id your-project-id
+python run_batch_explain.py --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain
 ```
 
 ## Topics
