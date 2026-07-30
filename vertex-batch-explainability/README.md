@@ -19,25 +19,21 @@ Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucke
 
 ![image](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs-upload-instances.png)
 
-# 🐝 `batch_explain.py`
+# <img width="40" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/vertex-ai.png"> `batch_explain.py`
 
 📖
 
-[`batch_explain.py`](batch_explain.py) is a Python script that runs the full Vertex batch explainability flow.
+`batch_explain.py` code is a batch explainability pipeline implemented using scikit-learn and Vertex AI. It reads data from an input file, trains a credit-risk classifier on HELOC data, registers the model on Vertex AI with explanation settings, and writes predictions plus feature attributions to a BigQuery table.
 
 The pipeline consists of the following steps:
 
-Command-line arguments are parsed to specify your GCP project, GCS bucket, and input file.
-
-The data is read from the input file and loaded into the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
-
-The HELOC training data is read from `heloc.csv` and a scikit-learn pipeline is trained (median imputer → standard scaler → logistic regression).
-
-`model.joblib` and `feature_names.json` are uploaded to your GCS bucket.
-
-The model is registered on Vertex AI with explanation settings for all 22 input features.
-
-A batch prediction job reads from `heloc_batch_input`, scores each row, and writes predictions plus feature attributions to `heloc_batch_explanations`.
+1. Command-line arguments are parsed to specify your GCP project, GCS bucket, and input file.
+2. The data is read from the input file and loaded into the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
+3. The HELOC training data is read from `heloc.csv` and a scikit-learn pipeline is trained (median imputer → standard scaler → logistic regression).
+4. `model.joblib` and `feature_names.json` are uploaded to your GCS bucket.
+5. The model is registered on Vertex AI with explanation settings for all 22 input features.
+6. A batch prediction job reads from `heloc_batch_input`, scores each row, and writes predictions plus feature attributions to `heloc_batch_explanations`.
+7. The batch job is started, and the model and job resource names are printed to the console.
 
 👩‍💻
 
