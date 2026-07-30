@@ -13,7 +13,7 @@ Find the code and CSV file on my github account.
 
 [github.com/04pallav/gcp-ml-tutorials/vertex-batch-explainability](https://github.com/04pallav/gcp-ml-tutorials/tree/main/vertex-batch-explainability)
 
-# 🗃️ GCS
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs.png"> GCS
 
 Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO HELOC dataset on OpenML](https://www.openml.org/d/45023) — 10,000 borrowers a lender might score and explain. It includes information such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent. The data showcases various credit-risk scenarios, providing valuable insights into payment history and utilization patterns banks review for home-equity credit lines.
 
