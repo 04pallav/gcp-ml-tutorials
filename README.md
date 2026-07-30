@@ -1,12 +1,20 @@
 # ☁️ GCP ML Tutorials
 
-Tutorial write-ups for Google Cloud Machine Learning.
+Public tutorials and runnable code for Google Cloud Machine Learning.
 
-**Code:** [github.com/04pallav/gcp-ml-staging](https://github.com/04pallav/gcp-ml-staging)
+## Vertex AI Batch Explainability
 
-## Tutorials
+**Article:** [tutorials/vertex-ai-batch-explainability.md](tutorials/vertex-ai-batch-explainability.md)
 
-- [Vertex AI Batch Explainability](tutorials/vertex-ai-batch-explainability.md) — Explain credit-risk batch predictions with Vertex AI, BigQuery, and scikit-learn.
+**Code:** [code/vertex-batch-explainability/](code/vertex-batch-explainability/)
+
+```bash
+git clone https://github.com/04pallav/gcp-ml-tutorials.git
+cd gcp-ml-tutorials/code/vertex-batch-explainability
+cp config.example.json config.local.json
+pip install -r requirements.txt
+python train_model.py
+```
 
 ## Topics
 
