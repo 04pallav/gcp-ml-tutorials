@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""Vertex batch explainability — one script: BQ input, train, upload, batch explain."""
-
-from __future__ import annotations
+"""Vertex batch explainability — BQ input, train, upload, batch explain."""
 
 import argparse
 import csv
@@ -21,149 +19,102 @@ from sklearn.preprocessing import StandardScaler
 from heloc_data import FEATURE_NAMES, load_heloc
 
 SERVING_CONTAINER = "us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-6:latest"
+DATASET = "ml_explainability"
+INPUT_TABLE = "heloc_batch_input"
+OUTPUT_TABLE = "heloc_batch_explanations"
 
+# Command-line argument parser
+parser = argparse.ArgumentParser()
+parser.add_argument("--project-id", required=True)
+parser.add_argument("--bucket-uri", required=True, help="e.g. gs://your-bucket/vertex-batch-explain")
+parser.add_argument("--region", default="us-central1")
+parser.add_argument("--instances", default="instances.csv", help="local path or gs:// URI")
+args = parser.parse_args()
 
-def read_instances_csv(path: str) -> list[dict]:
-    if path.startswith("gs://"):
-        bucket_name, _, blob_name = path.removeprefix("gs://").partition("/")
-        raw = storage.Client().bucket(bucket_name).blob(blob_name).download_as_text()
-        reader = csv.DictReader(io.StringIO(raw))
-    else:
-        with open(path, newline="") as f:
-            reader = csv.DictReader(f)
-    rows = list(reader)
-    return [{name: float(row[name]) for name in FEATURE_NAMES} for row in rows]
+aiplatform.init(project=args.project_id, location=args.region)
 
+# Read instances CSV
+if args.instances.startswith("gs://"):
+    bucket_name, _, blob_name = args.instances.removeprefix("gs://").partition("/")
+    raw = storage.Client().bucket(bucket_name).blob(blob_name).download_as_text()
+    reader = csv.DictReader(io.StringIO(raw))
+else:
+    with open(args.instances, newline="") as f:
+        reader = csv.DictReader(f)
+rows = [{name: float(row[name]) for name in FEATURE_NAMES} for row in reader]
 
-def load_instances_to_bq(project_id: str, dataset: str, table: str, instances_path: str) -> str:
-    instances = read_instances_csv(instances_path)
-    table_id = f"{project_id}.{dataset}.{table}"
-    client = bigquery.Client(project=project_id)
-    client.create_dataset(f"{project_id}.{dataset}", exists_ok=True)
-    rows = [{name: float(row[name]) for name in FEATURE_NAMES} for row in instances]
-    schema = [bigquery.SchemaField(name, "FLOAT") for name in FEATURE_NAMES]
-    job = client.load_table_from_json(
-        rows,
-        table_id,
-        job_config=bigquery.LoadJobConfig(
-            schema=schema,
-            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-        ),
-    )
-    job.result()
-    print(f"[bq] loaded {len(rows)} rows to {table_id}", flush=True)
-    return table_id
+# Load input to BigQuery
+table_id = f"{args.project_id}.{DATASET}.{INPUT_TABLE}"
+bq = bigquery.Client(project=args.project_id)
+bq.create_dataset(f"{args.project_id}.{DATASET}", exists_ok=True)
+bq.load_table_from_json(
+    rows,
+    table_id,
+    job_config=bigquery.LoadJobConfig(
+        schema=[bigquery.SchemaField(name, "FLOAT") for name in FEATURE_NAMES],
+        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+    ),
+).result()
+print(f"Loaded {len(rows)} rows to {table_id}")
 
+# Train HELOC model
+X, y = load_heloc()
+X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+model = Pipeline([
+    ("imputer", SimpleImputer(strategy="median")),
+    ("scaler", StandardScaler()),
+    ("clf", LogisticRegression(max_iter=1000, class_weight="balanced")),
+])
+model.fit(X_train, y_train)
 
-def train_model(output_dir: str) -> None:
-    X, y = load_heloc()
-    X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    model = Pipeline([
-        ("imputer", SimpleImputer(strategy="median")),
-        ("scaler", StandardScaler()),
-        ("clf", LogisticRegression(max_iter=1000, class_weight="balanced")),
-    ])
-    model.fit(X_train, y_train)
-    os.makedirs(output_dir, exist_ok=True)
-    joblib.dump(model, os.path.join(output_dir, "model.joblib"))
-    with open(os.path.join(output_dir, "feature_names.json"), "w") as f:
-        json.dump({"feature_names": FEATURE_NAMES, "explanation_output_key": "probability"}, f, indent=2)
-    print(f"[train] saved model to {output_dir}", flush=True)
+with tempfile.TemporaryDirectory() as tmp:
+    model_dir = os.path.join(tmp, "models")
+    os.makedirs(model_dir, exist_ok=True)
+    joblib.dump(model, os.path.join(model_dir, "model.joblib"))
+    with open(os.path.join(model_dir, "feature_names.json"), "w") as f:
+        json.dump({"feature_names": FEATURE_NAMES, "explanation_output_key": "probability"}, f)
 
-
-def parse_gcs_uri(uri: str) -> tuple[str, str]:
-    bucket, _, prefix = uri.removeprefix("gs://").partition("/")
-    return bucket, prefix.rstrip("/")
-
-
-def upload_dir_to_gcs(local_dir: str, bucket_uri: str, subdir: str) -> str:
-    bucket_name, prefix = parse_gcs_uri(bucket_uri)
-    dest_prefix = f"{prefix}/{subdir}" if prefix else subdir
-    client = storage.Client()
-    bucket = client.bucket(bucket_name)
-    for name in os.listdir(local_dir):
-        path = os.path.join(local_dir, name)
+    # Upload model artifacts to GCS
+    bucket_name, _, prefix = args.bucket_uri.removeprefix("gs://").partition("/")
+    prefix = f"{prefix.rstrip('/')}/models" if prefix else "models"
+    bucket = storage.Client().bucket(bucket_name)
+    for name in os.listdir(model_dir):
+        path = os.path.join(model_dir, name)
         if os.path.isfile(path):
-            blob = bucket.blob(f"{dest_prefix}/{name}")
+            blob = bucket.blob(f"{prefix}/{name}")
             blob.upload_from_filename(path)
-            print(f"[gcs] gs://{bucket_name}/{dest_prefix}/{name}", flush=True)
-    return f"gs://{bucket_name}/{dest_prefix}/"
+            print(f"Uploaded gs://{bucket_name}/{prefix}/{name}")
 
+artifact_uri = f"gs://{bucket_name}/{prefix}/"
 
-def upload_explainable_model(project_id: str, region: str, artifact_uri: str, display_name: str):
-    explanation_parameters = aiplatform.explain.ExplanationParameters({
-        "sampled_shapley_attribution": {"path_count": 10},
-    })
-    explanation_metadata = aiplatform.explain.ExplanationMetadata(
+# Register explainable model on Vertex AI
+vertex_model = aiplatform.Model.upload(
+    display_name="heloc-batch-explain",
+    artifact_uri=artifact_uri,
+    serving_container_image_uri=SERVING_CONTAINER,
+    explanation_parameters=aiplatform.explain.ExplanationParameters(
+        {"sampled_shapley_attribution": {"path_count": 10}},
+    ),
+    explanation_metadata=aiplatform.explain.ExplanationMetadata(
         inputs={name: {} for name in FEATURE_NAMES},
         outputs={"probability": {}},
-    )
-    model = aiplatform.Model.upload(
-        display_name=display_name,
-        artifact_uri=artifact_uri,
-        serving_container_image_uri=SERVING_CONTAINER,
-        explanation_parameters=explanation_parameters,
-        explanation_metadata=explanation_metadata,
-    )
-    print(f"[vertex] model: {model.resource_name}", flush=True)
-    return model
+    ),
+)
+print(f"Model registered: {vertex_model.resource_name}")
 
-
-def run_batch_job(model, *, project_id: str, dataset: str, input_table: str, output_table: str,
-                  job_name: str, machine_type: str, batch_size: int) -> None:
-    bq_input = f"{project_id}.{dataset}.{input_table}"
-    bq_output = f"{project_id}.{dataset}.{output_table}"
-    print(f"[vertex] batch input:  {bq_input}", flush=True)
-    print(f"[vertex] batch output: {bq_output}", flush=True)
-    job = model.batch_predict(
-        job_display_name=job_name,
-        instances_format="bigquery",
-        bigquery_source=f"bq://{bq_input}",
-        predictions_format="bigquery",
-        bigquery_destination_prefix=f"bq://{bq_output}",
-        generate_explanation=True,
-        machine_type=machine_type,
-        batch_size=batch_size,
-        starting_replica_count=1,
-        max_replica_count=1,
-    )
-    print(f"[vertex] batch job: {job.resource_name}", flush=True)
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--project-id", required=True)
-    parser.add_argument("--bucket-uri", required=True, help="e.g. gs://your-bucket/vertex-batch-explain")
-    parser.add_argument("--region", default="us-central1")
-    parser.add_argument("--instances", default="instances.csv", help="local path or gs:// URI")
-    parser.add_argument("--dataset", default="ml_explainability")
-    parser.add_argument("--input-table", default="heloc_batch_input")
-    parser.add_argument("--output-table", default="heloc_batch_explanations")
-    parser.add_argument("--machine-type", default="n2-standard-4")
-    parser.add_argument("--batch-size", type=int, default=16)
-    args = parser.parse_args()
-
-    aiplatform.init(project=args.project_id, location=args.region)
-
-    load_instances_to_bq(args.project_id, args.dataset, args.input_table, args.instances)
-
-    with tempfile.TemporaryDirectory() as tmp:
-        model_dir = os.path.join(tmp, "models")
-        train_model(model_dir)
-        artifact_uri = upload_dir_to_gcs(model_dir, args.bucket_uri, "models")
-
-    model = upload_explainable_model(args.project_id, args.region, artifact_uri, "heloc-batch-explain")
-    run_batch_job(
-        model,
-        project_id=args.project_id,
-        dataset=args.dataset,
-        input_table=args.input_table,
-        output_table=args.output_table,
-        job_name="heloc-batch-explain-job",
-        machine_type=args.machine_type,
-        batch_size=args.batch_size,
-    )
-
-
-if __name__ == "__main__":
-    main()
+# Batch prediction with explanations
+bq_input = f"bq://{args.project_id}.{DATASET}.{INPUT_TABLE}"
+bq_output = f"bq://{args.project_id}.{DATASET}.{OUTPUT_TABLE}"
+job = vertex_model.batch_predict(
+    job_display_name="heloc-batch-explain-job",
+    instances_format="bigquery",
+    bigquery_source=bq_input,
+    predictions_format="bigquery",
+    bigquery_destination_prefix=bq_output,
+    generate_explanation=True,
+    machine_type="n2-standard-4",
+    batch_size=16,
+    starting_replica_count=1,
+    max_replica_count=1,
+)
+print(f"Batch job started: {job.resource_name}")
