@@ -17,7 +17,7 @@ Find the code and CSV file on my github account.
 
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs.png"> Step 1 — Upload the data to GCS
 
-Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO consumer credit dataset on OpenML](https://www.openml.org/d/45023) — 10,000 borrowers a lender might score and explain. Each row includes bureau features such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent.
+Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO consumer credit dataset on OpenML](https://www.openml.org/d/45023) — 10,000 borrowers a lender might score and explain. Feature definitions and missing-value codes (`-7`, `-8`, `-9`) are documented on that [OpenML page](https://www.openml.org/d/45023). Each row includes bureau features such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent.
 
 ![Upload instances.csv to GCS](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs-upload-instances.png)
 
@@ -33,7 +33,7 @@ Set the project and install scikit-learn and the Vertex AI SDK.
 
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/bigquery.png"> Step 3 — Load the data into BigQuery
 
-The `load` step reads `instances.csv` and writes it to the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
+The `load` step reads `instances.csv` and writes the 22 feature columns to BigQuery table `heloc_batch_input` (the `RiskPerformance` label stays in the CSV but is not loaded into BigQuery).
 
 👨‍💻 `python batch_explain.py load --instances gs://your-bucket/instances.csv`
 
@@ -49,9 +49,9 @@ You should see 10,000 rows from `instances.csv`.
 
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/vertex-ai.png"> Step 4 — Train the model
 
-**The model** — `batch_explain.py` trains a scikit-learn **logistic regression** on `heloc.csv` (10,000 labeled borrowers from the [FICO consumer credit dataset](https://www.openml.org/d/45023)). It takes 22 credit-bureau features per borrower and predicts `probability` — the chance the borrower ends up 90+ days past due (`RiskPerformance` = Bad).
+The `train()` method in `batch_explain.py` fits a scikit-learn **logistic regression** on `instances.csv`. We predict `probability` — the chance the borrower ends up 90+ days past due (`RiskPerformance` = Bad).
 
-The `train` step fits the pipeline, prints train/test ROC AUC, and uploads `model.joblib` + `feature_names.json` to your bucket.
+The `train` step fits the pipeline, prints train/test ROC AUC, and uploads `model.joblib` to your bucket.
 
 👨‍💻 `python batch_explain.py train --bucket-uri gs://your-bucket/vertex-batch-explain`
 
@@ -68,7 +68,7 @@ The `explain` step does two things: register your model on Vertex AI, then start
 Vertex loads `model.joblib` from GCS into Google's prebuilt sklearn container ([`sklearn-cpu.1-6`](https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers)) and attaches explanation settings.
 
 - `display_name` — name shown in the Vertex AI console (`heloc-batch-explain`)
-- `artifact_uri` — GCS path to `model.joblib` and `feature_names.json` from Step 4
+- `artifact_uri` — GCS path to `model.joblib` from Step 4
 - `serving_container_image_uri` — Google's prebuilt sklearn 1.6 image that loads your artifact and serves predictions
 - `explanation_parameters` — how to explain: Sampled Shapley with `path_count=10` (10 random feature permutations per row)
 - `explanation_metadata` — maps the 22 input features to attributions; uses `BAG_OF_FEATURES` because BigQuery sends each row as a nameless array of 22 floats
