@@ -47,7 +47,7 @@ SELECT * FROM `your-project-id.ml_explainability.heloc_batch_input` ORDER BY Ext
 
 You should see 10,000 rows from `instances.csv`.
 
-![heloc_batch_input in BigQuery](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step3-bq-input.png)
+![heloc_batch_input in BigQuery](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step3-bq-input-v2.png)
 
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/vertex-ai.png"> Step 4 — Train the model
 
