@@ -15,25 +15,11 @@ Find the code and CSV file on my github account.
 
 [github.com/04pallav/gcp-ml-tutorials/vertex-batch-explainability](https://github.com/04pallav/gcp-ml-tutorials/tree/main/vertex-batch-explainability)
 
-## The model
-
-`batch_explain.py` trains a scikit-learn **logistic regression** on `heloc.csv` (10,000 labeled borrowers from the [FICO consumer credit dataset](https://www.openml.org/d/45023)). It takes 22 credit-bureau features per borrower and predicts `probability` — the chance the borrower ends up 90+ days past due (`RiskPerformance` = Bad).
-
-```mermaid
-flowchart LR
-    A["22 bureau features"] --> B["Median imputer"]
-    B --> C["Standard scaler"]
-    C --> D["Logistic regression"]
-    D --> E["P(default)"]
-```
-
-The script has three steps you run one at a time — `load`, `train`, `explain` — so you can inspect the result of each before moving on. (You can also run `all` to do every step in sequence.)
-
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs.png"> Step 1 — Upload the data to GCS
 
 Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO consumer credit dataset on OpenML](https://www.openml.org/d/45023) — 10,000 borrowers a lender might score and explain. Each row includes bureau features such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent.
 
-👩‍💻 `gsutil cp instances.csv gs://your-bucket/instances.csv`
+👨‍💻 `gsutil cp instances.csv gs://your-bucket/instances.csv`
 
 ![Upload instances.csv to GCS](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs-upload-instances.png)
 
@@ -41,17 +27,19 @@ Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucke
 
 Set the project and install scikit-learn and the Vertex AI SDK.
 
-👩‍💻 `gcloud config set project your-project-id`
+👨‍💻 `gcloud config set project your-project-id`
 
-👩‍💻 `pip install google-cloud-aiplatform 'scikit-learn==1.6.*'`
+👨‍💻 `pip install google-cloud-aiplatform 'scikit-learn==1.6.*'`
 
 ![Cloud shell install](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step2-install.png)
 
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/bigquery.png"> Step 3 — Load the batch input into BigQuery
 
+`batch_explain.py` has three steps you run one at a time — `load`, `train`, `explain` — so you can inspect the result of each before moving on. (You can also run `all` to do every step in sequence.)
+
 The `load` step reads `instances.csv` and writes it to the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
 
-👩‍💻 `python batch_explain.py load --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain --instances gs://your-bucket/instances.csv`
+👨‍💻 `python batch_explain.py load --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain --instances gs://your-bucket/instances.csv`
 
 Then inspect the rows in BigQuery:
 
@@ -65,9 +53,11 @@ You should see 10,000 rows from `instances.csv`.
 
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/vertex-ai.png"> Step 4 — Train the model
 
-The `train` step fits the pipeline (median imputer → standard scaler → logistic regression) on `heloc.csv`, prints train/test ROC AUC, and uploads `model.joblib` + `feature_names.json` to your bucket.
+**The model** — `batch_explain.py` trains a scikit-learn **logistic regression** on `heloc.csv` (10,000 labeled borrowers from the [FICO consumer credit dataset](https://www.openml.org/d/45023)). It takes 22 credit-bureau features per borrower and predicts `probability` — the chance the borrower ends up 90+ days past due (`RiskPerformance` = Bad).
 
-👩‍💻 `python batch_explain.py train --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain`
+The `train` step fits the pipeline, prints train/test ROC AUC, and uploads `model.joblib` + `feature_names.json` to your bucket.
+
+👨‍💻 `python batch_explain.py train --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain`
 
 Check the printed ROC AUC and confirm `model.joblib` landed in `gs://your-bucket/vertex-batch-explain/models/`.
 
@@ -77,7 +67,7 @@ Check the printed ROC AUC and confirm `model.joblib` landed in `gs://your-bucket
 
 The `explain` step registers the model on Vertex AI with explanations enabled for all 22 features and starts a batch job that writes scores + attributions to `heloc_batch_explanations`. Re-running reuses the existing `heloc-batch-explain` model.
 
-👩‍💻 `python batch_explain.py explain --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain`
+👨‍💻 `python batch_explain.py explain --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain`
 
 ❗ Make sure that all your files and services are in the same location. E.g. both buckets should be in the same location or you will get a similar error message: ‘Cannot read and write in different locations: source: US, destination: EU’
 
