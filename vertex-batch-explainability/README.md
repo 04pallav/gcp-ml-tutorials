@@ -88,12 +88,22 @@ model = aiplatform.Model.upload(
 
 **Why `BAG_OF_FEATURES` and `index_feature_mapping`?**
 
-BigQuery stores named columns (`ExternalRiskEstimate`, `NumInqLast6M`, …), but Vertex batch prediction sends each row to the model as an **ordered list of numbers** — like `[55, 144, 58, …]` with no labels attached. Google's docs call this a *tensor*; that just means a list of values in a fixed order, not TensorFlow.
+In Step 3 you loaded a BigQuery table with **named columns** — `ExternalRiskEstimate`, `NumInqLast6M`, and so on.
 
-- **`encoding: "BAG_OF_FEATURES"`** — tells Vertex this input is a list of separate features packed together (see the [Encoding docs](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding): *"each index maps to a feature"*).
-- **`index_feature_mapping: FEATURES`** — the cheat sheet: position 0 → `ExternalRiskEstimate`, position 1 → `MSinceOldestTradeOpen`, and so on for all 22 features. Required for `BAG_OF_FEATURES` — same idea as Google's example `input = [27, 6.0, 150]` with `indexFeatureMapping = ["age", "height", "weight"]`.
+When Vertex runs batch prediction, it does **not** pass those names to the model. Each row becomes a plain list of 22 numbers in a fixed column order:
 
-Without the mapping, Vertex can score the row but attributions come back as "position 14" instead of `NumInqLast6M`.
+```
+ExternalRiskEstimate=55, MSinceOldestTradeOpen=144, …  →  [55, 144, 58, …]
+```
+
+Position matters; column names are dropped. Google's docs call this input a *tensor* — here that just means "a list of numbers in a fixed order," not TensorFlow.
+
+To get human-readable explanations, `explanation_metadata` tells Vertex how to read that list:
+
+1. **`encoding: "BAG_OF_FEATURES"`** — this list is 22 separate features packed together, not one opaque blob. See the [Encoding docs](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding).
+2. **`index_feature_mapping: FEATURES`** — index 0 is `ExternalRiskEstimate`, index 1 is `MSinceOldestTradeOpen`, … for all 22 columns. Same idea as Google's example: `[27, 6.0, 150]` with `["age", "height", "weight"]`.
+
+**Without the mapping:** predictions still work, but attributions come back as `feature_attributions[14]` instead of `NumInqLast6M` — hard to use in BigQuery or Looker.
 
 **`batch_predict()` — score + explain every row**
 
