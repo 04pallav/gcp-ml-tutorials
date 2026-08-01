@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+import csv
+from math import nan
 from pathlib import Path
-
-import numpy as np
-import pandas as pd
 
 FEATURE_NAMES = [
     "ExternalRiskEstimate",
@@ -34,10 +33,20 @@ FEATURE_NAMES = [
 
 TARGET_COLUMN = "RiskPerformance"
 DATA_PATH = Path(__file__).with_name("heloc.csv")
+_MISSING = {"", "-7", "-8", "-9"}
 
 
-def load_heloc() -> tuple[pd.DataFrame, pd.Series]:
-    df = pd.read_csv(DATA_PATH)
-    X = df[FEATURE_NAMES].replace([-7, -8, -9], np.nan)
-    y = (df[TARGET_COLUMN].astype(str) == "1").astype(int)
-    return X, y
+def feature_value(raw: str) -> float:
+    if raw in _MISSING:
+        return nan
+    return float(raw)
+
+
+def load_heloc() -> tuple[list[list[float]], list[int]]:
+    features: list[list[float]] = []
+    labels: list[int] = []
+    with DATA_PATH.open(newline="") as f:
+        for row in csv.DictReader(f):
+            features.append([feature_value(row[name]) for name in FEATURE_NAMES])
+            labels.append(1 if row[TARGET_COLUMN].strip() == "1" else 0)
+    return features, labels

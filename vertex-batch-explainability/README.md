@@ -27,6 +27,26 @@ Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucke
 
 `batch_explain.py` code is a batch explainability pipeline implemented using scikit-learn and Vertex AI. It reads data from an input file, trains a classifier to estimate loan default risk, registers the model on Vertex AI with explanation settings, and writes predicted probabilities plus feature attributions to a BigQuery table.
 
+## The model
+
+We train a **logistic regression** classifier on `heloc.csv` (10,000 labeled borrowers from the [FICO consumer credit dataset](https://www.openml.org/d/45023)).
+
+- **Input:** 22 credit-bureau features per borrower (e.g. `ExternalRiskEstimate`, `NumInqLast6M`, `MSinceMostRecentDelq`)
+- **Target:** `RiskPerformance` — **Bad (1)** = 90+ days past due at least once; **Good (0)** = paid as agreed
+- **Output:** `probability` — predicted risk of default (probability of class 1)
+
+The classifier is a scikit-learn **Pipeline** — three steps applied in order:
+
+```mermaid
+flowchart LR
+    A["22 bureau features"] --> B["Median imputer"]
+    B --> C["Standard scaler"]
+    C --> D["Logistic regression"]
+    D --> E["P(default)"]
+```
+
+On a re-run, if a Vertex model named `heloc-batch-explain` already exists, steps 3–5 are skipped and the script reuses it.
+
 The pipeline consists of the following steps:
 
 1. Command-line arguments are parsed to specify your GCP project, GCS bucket, and input file.
@@ -37,11 +57,30 @@ The pipeline consists of the following steps:
 6. A batch prediction job reads from `heloc_batch_input`, scores each row, and writes predictions plus feature attributions to `heloc_batch_explanations`.
 7. The batch job is started, and the model and job resource names are printed to the console.
 
+When you run the script, numbered progress lines appear in the shell:
+
+```
+[1] project=your-project-id bucket=gs://your-bucket/vertex-batch-explain instances=gs://your-bucket/instances.csv
+[2] Reading instances from gs://your-bucket/instances.csv
+[2] Loading 10000 rows to BigQuery table heloc_batch_input
+[2] Done — your-project-id.ml_explainability.heloc_batch_input
+[3] Training scikit-learn pipeline on heloc.csv
+[3] Done — model trained
+[4] Uploading model artifacts to gs://your-bucket/vertex-batch-explain/models/
+[4] Uploaded gs://your-bucket/vertex-batch-explain/models/model.joblib
+[4] Uploaded gs://your-bucket/vertex-batch-explain/models/feature_names.json
+[5] Registering model on Vertex AI with explanation settings
+[5] Done — projects/.../locations/us-central1/models/...
+[6] Starting batch prediction: heloc_batch_input → heloc_batch_explanations
+[7] Batch job started: projects/.../locations/us-central1/batchPredictionJobs/...
+[7] Model: projects/.../locations/us-central1/models/...
+```
+
 👩‍💻
 
 Set the project in the cloud shell: `gcloud config set project your-project-id`
 
-Install dependencies in the cloud shell: `pip install -r requirements.txt`
+Install scikit-learn and the Vertex AI SDK in the cloud shell: `pip install google-cloud-aiplatform 'scikit-learn==1.6.*'`
 
 Give the batch_explain.py code a test run in the shell and then check the results in BigQuery: `python batch_explain.py --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain --instances gs://your-bucket/instances.csv`
 
