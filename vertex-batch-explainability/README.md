@@ -51,15 +51,17 @@ You should see 10,000 rows from `instances.csv`.
 
 The `train()` method in `batch_explain.py` fits a scikit-learn **logistic regression** on `instances.csv`. We predict `probability` — the chance the borrower ends up 90+ days past due (`RiskPerformance` = Bad).
 
-The `train` step fits the pipeline, prints train/test ROC AUC, and uploads `model.joblib` and `train_metrics.png` (coefficients + ROC side by side) to your bucket.
+The `train` step fits the pipeline, prints train/test ROC AUC, and uploads `model.joblib` and `train_metrics.png` to your bucket.
 
 👨‍💻 `python batch_explain.py train --bucket-uri gs://your-bucket/vertex-batch-explain`
 
-Check the printed ROC AUC and confirm `model.joblib` and `train_metrics.png` landed in `gs://your-bucket/vertex-batch-explain/models/`.
+Check the printed ROC AUC and confirm `model.joblib` landed in `gs://your-bucket/vertex-batch-explain/models/`.
+
+![model.joblib in GCS](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step4-train.png)
+
+The script also saves `train_metrics.png` to the same folder — logistic regression **coefficients** on the left (which features push risk up or down) and the test-set **ROC curve** on the right.
 
 ![Logistic regression coefficients and ROC curve](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step4-roc.png)
-
-![Training output and model artifact](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step4-train.png)
 
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/vertex-ai.png"> Step 5 — Run batch explanation job
 
