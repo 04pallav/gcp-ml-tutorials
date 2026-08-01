@@ -51,13 +51,13 @@ You should see 10,000 rows from `instances.csv`.
 
 The `train()` method in `batch_explain.py` fits a scikit-learn **logistic regression** on `instances.csv`. We predict `probability` — the chance the borrower ends up 90+ days past due (`RiskPerformance` = Bad).
 
-The `train` step fits the pipeline, prints train/test ROC AUC, and uploads `model.joblib` and `roc_curve.png` to your bucket.
+The `train` step fits the pipeline, prints train/test ROC AUC, and uploads `model.joblib` and `train_metrics.png` (coefficients + ROC side by side) to your bucket.
 
 👨‍💻 `python batch_explain.py train --bucket-uri gs://your-bucket/vertex-batch-explain`
 
-Check the printed ROC AUC and confirm `model.joblib` and `roc_curve.png` landed in `gs://your-bucket/vertex-batch-explain/models/`.
+Check the printed ROC AUC and confirm `model.joblib` and `train_metrics.png` landed in `gs://your-bucket/vertex-batch-explain/models/`.
 
-![ROC curve (test set)](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step4-roc.png)
+![Logistic regression coefficients and ROC curve](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step4-roc.png)
 
 ![Training output and model artifact](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step4-train.png)
 

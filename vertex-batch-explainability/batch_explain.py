@@ -127,18 +127,31 @@ def train(args) -> None:
         import matplotlib.pyplot as plt
         from sklearn.metrics import roc_curve
 
+        coefs = model.named_steps["clf"].coef_[0]
+        order = sorted(range(len(FEATURES)), key=lambda i: abs(coefs[i]), reverse=True)
+        names = [FEATURES[i] for i in order]
+        values = [coefs[i] for i in order]
+
+        fig, (ax_coef, ax_roc) = plt.subplots(1, 2, figsize=(12, 8))
+        ax_coef.barh(names, values, color=["#c44" if v > 0 else "#48c" for v in values])
+        ax_coef.set_xlabel("Coefficient (scaled features)")
+        ax_coef.set_title("Logistic regression")
+        ax_coef.invert_yaxis()
+
         fpr, tpr, _ = roc_curve(y_test, y_score)
-        plt.figure(figsize=(5, 4))
-        plt.plot(fpr, tpr, label=f"test AUC={test_auc:.3f}")
-        plt.plot([0, 1], [0, 1], "k--", alpha=0.4)
-        plt.xlabel("False positive rate")
-        plt.ylabel("True positive rate")
-        plt.legend(loc="lower right")
-        roc_path = os.path.join(tmp, "roc_curve.png")
-        plt.savefig(roc_path, dpi=100, bbox_inches="tight")
-        plt.close()
-        bkt.blob(f"{prefix}/roc_curve.png").upload_from_filename(roc_path)
-    print(f"[train] uploaded {uri}model.joblib and roc_curve.png", flush=True)
+        ax_roc.plot(fpr, tpr, label=f"test AUC={test_auc:.3f}")
+        ax_roc.plot([0, 1], [0, 1], "k--", alpha=0.4)
+        ax_roc.set_xlabel("False positive rate")
+        ax_roc.set_ylabel("True positive rate")
+        ax_roc.set_title("ROC curve (test set)")
+        ax_roc.legend(loc="lower right")
+
+        fig.tight_layout()
+        plot_path = os.path.join(tmp, "train_metrics.png")
+        fig.savefig(plot_path, dpi=100, bbox_inches="tight")
+        plt.close(fig)
+        bkt.blob(f"{prefix}/train_metrics.png").upload_from_filename(plot_path)
+    print(f"[train] uploaded {uri}model.joblib and train_metrics.png", flush=True)
 
 
 def explain(args) -> None:
