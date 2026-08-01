@@ -86,6 +86,8 @@ model = aiplatform.Model.upload(
 
 Vertex loads `model.joblib` from GCS into Google's prebuilt sklearn container ([`sklearn-cpu.1-6`](https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers)) and attaches explanation settings. In Step 3 you loaded named BigQuery columns (`ExternalRiskEstimate`, `NumInqLast6M`, …), but batch prediction sends each row as a fixed-order list of numbers — `ExternalRiskEstimate=55, MSinceOldestTradeOpen=144, …` becomes `[55, 144, 58, …]` — so `explanation_metadata` uses `BAG_OF_FEATURES` (22 separate features, not one blob) and `index_feature_mapping` (index 0 → `ExternalRiskEstimate`, index 1 → `MSinceOldestTradeOpen`, …) to label attributions in the output. See [Configure feature-based explanations](https://cloud.google.com/vertex-ai/docs/explainable-ai/configuring-explanations-feature-based#explanation-metadatajson) and [`ExplanationMetadata` `Encoding`](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding).
 
+`explanation_parameters` picks how attributions are computed. `sampled_shapley_attribution` with `path_count: 10` estimates each feature's contribution by averaging over 10 random feature orderings (Shapley values). Higher `path_count` gives stabler attributions but costs more per row — 10 is a practical default for this tutorial.
+
 **`batch_predict()` — score + explain every row**
 
 ```python
