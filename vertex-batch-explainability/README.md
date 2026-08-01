@@ -42,7 +42,9 @@ The `load` step reads `instances.csv` and writes it to the BigQuery table `heloc
 Then inspect the rows in BigQuery:
 
 ```sql
-SELECT * FROM `your-project-id.ml_explainability.heloc_batch_input` LIMIT 10;
+SELECT * FROM `your-project-id.ml_explainability.heloc_batch_input`
+ORDER BY ExternalRiskEstimate DESC
+LIMIT 10;
 ```
 
 You should see 10,000 rows from `instances.csv`.
