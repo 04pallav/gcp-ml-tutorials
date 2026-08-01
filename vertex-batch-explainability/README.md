@@ -69,7 +69,7 @@ The `explain` step registers your model on Vertex AI, then starts a batch job th
 
 **`Model.upload()` — register the model**
 
-Vertex loads `model.joblib` from GCS into Google's prebuilt sklearn container ([`sklearn-cpu.1-6`](https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers)) and attaches explanation settings. See [Configure feature-based explanations](https://cloud.google.com/vertex-ai/docs/explainable-ai/configuring-explanations-feature-based#explanation-metadatajson) and [`ExplanationMetadata` `Encoding`](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding).
+Vertex loads `model.joblib` from GCS into Google's prebuilt sklearn container ([`sklearn-cpu.1-6`](https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers)) and attaches explanation settings. In Step 3 you loaded named BigQuery columns (`ExternalRiskEstimate`, `NumInqLast6M`, …), but batch prediction sends each row as a fixed-order list of numbers — `ExternalRiskEstimate=55, MSinceOldestTradeOpen=144, …` becomes `[55, 144, 58, …]` — so `explanation_metadata` uses `BAG_OF_FEATURES` (22 separate features, not one blob) and `index_feature_mapping` (index 0 → `ExternalRiskEstimate`, index 1 → `MSinceOldestTradeOpen`, …) to label attributions in the output. See [Configure feature-based explanations](https://cloud.google.com/vertex-ai/docs/explainable-ai/configuring-explanations-feature-based#explanation-metadatajson) and [`ExplanationMetadata` `Encoding`](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding).
 
 ```python
 model = aiplatform.Model.upload(
@@ -85,25 +85,6 @@ model = aiplatform.Model.upload(
     ),
 )
 ```
-
-**Why `BAG_OF_FEATURES` and `index_feature_mapping`?**
-
-In Step 3 you loaded a BigQuery table with **named columns** — `ExternalRiskEstimate`, `NumInqLast6M`, and so on.
-
-When Vertex runs batch prediction, it does **not** pass those names to the model. Each row becomes a plain list of 22 numbers in a fixed column order:
-
-```
-ExternalRiskEstimate=55, MSinceOldestTradeOpen=144, …  →  [55, 144, 58, …]
-```
-
-Position matters; column names are dropped. Google's docs call this input a *tensor* — here that just means "a list of numbers in a fixed order," not TensorFlow.
-
-To get human-readable explanations, `explanation_metadata` tells Vertex how to read that list:
-
-1. **`encoding: "BAG_OF_FEATURES"`** — this list is 22 separate features packed together, not one opaque blob. See the [Encoding docs](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding).
-2. **`index_feature_mapping: FEATURES`** — index 0 is `ExternalRiskEstimate`, index 1 is `MSinceOldestTradeOpen`, … for all 22 columns. Same idea as Google's example: `[27, 6.0, 150]` with `["age", "height", "weight"]`.
-
-**Without the mapping:** predictions still work, but attributions come back as `feature_attributions[14]` instead of `NumInqLast6M` — hard to use in BigQuery or Looker.
 
 **`batch_predict()` — score + explain every row**
 
