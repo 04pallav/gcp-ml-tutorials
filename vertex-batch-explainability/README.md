@@ -69,7 +69,7 @@ The `explain` step registers your model on Vertex AI, then starts a batch job th
 
 **`Model.upload()` — register the model**
 
-Vertex loads `model.joblib` from GCS into Google's prebuilt sklearn container ([`sklearn-cpu.1-6`](https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers)) and attaches explanation settings. See [Configure feature-based explanations](https://cloud.google.com/vertex-ai/docs/explainable-ai/configuring-explanations-feature-based) and [`ExplanationMetadata`](https://cloud.google.com/vertex-ai/docs/reference/rest/v1/ExplanationSpec#ExplanationMetadata) (`BAG_OF_FEATURES`, `index_feature_mapping`).
+Vertex loads `model.joblib` from GCS into Google's prebuilt sklearn container ([`sklearn-cpu.1-6`](https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers)) and attaches explanation settings. See [Configure feature-based explanations](https://cloud.google.com/vertex-ai/docs/explainable-ai/configuring-explanations-feature-based#explanation-metadatajson) and [`InputMetadata`](https://cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#InputMetadata) — we use [`BAG_OF_FEATURES`](https://cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding.ENUM_VALUES.BAG_OF_FEATURES) with [`index_feature_mapping`](https://cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#InputMetadata.FIELDS.index_feature_mapping) because BigQuery batch rows are unnamed floats.
 
 ```python
 model = aiplatform.Model.upload(
