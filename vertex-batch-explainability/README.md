@@ -86,7 +86,7 @@ model = aiplatform.Model.upload(
 
 `Model.upload()` registers the model on Vertex AI — GCS artifact + sklearn serving container + explanation settings. Batch prediction sends each row as a fixed-order list (`[55, 144, 58, …]`), so `BAG_OF_FEATURES` and `index_feature_mapping` tell Vertex which index maps to which feature name in the attributions.
 
-See [`ExplanationMetadata` `Encoding`](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding).
+See [ExplanationMetadata Encoding](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding).
 
 `explanation_parameters` picks how attributions are computed. `sampled_shapley_attribution` with `path_count: 10` estimates each feature's contribution by averaging over 10 random feature orderings (Shapley values). Higher `path_count` gives stabler attributions but costs more per row — 10 is a practical default for this tutorial.
 
