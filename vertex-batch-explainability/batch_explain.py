@@ -109,18 +109,36 @@ def train(args) -> None:
         ("scaler", StandardScaler()),
         ("clf", LogisticRegression(max_iter=1000, class_weight="balanced")),
     ]).fit(X_train, y_train)
-    print(
-        f"[train] ROC AUC train={roc_auc_score(y_train, model.predict_proba(X_train)[:, 1]):.3f} "
-        f"test={roc_auc_score(y_test, model.predict_proba(X_test)[:, 1]):.3f}",
-        flush=True,
-    )
+    y_score = model.predict_proba(X_test)[:, 1]
+    test_auc = roc_auc_score(y_test, y_score)
+    train_auc = roc_auc_score(y_train, model.predict_proba(X_train)[:, 1])
+    print(f"[train] ROC AUC train={train_auc:.3f} test={test_auc:.3f}", flush=True)
 
     bucket, uri = model_uri(args.bucket_uri)
+    prefix = uri.removeprefix(f"gs://{bucket}/").rstrip("/")
     with tempfile.TemporaryDirectory() as tmp:
-        path = os.path.join(tmp, "model.joblib")
-        joblib.dump(model, path)
-        storage.Client().bucket(bucket).blob("models/model.joblib").upload_from_filename(path)
-    print(f"[train] uploaded {uri}model.joblib", flush=True)
+        model_path = os.path.join(tmp, "model.joblib")
+        joblib.dump(model, model_path)
+        bkt = storage.Client().bucket(bucket)
+        bkt.blob(f"{prefix}/model.joblib").upload_from_filename(model_path)
+
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from sklearn.metrics import roc_curve
+
+        fpr, tpr, _ = roc_curve(y_test, y_score)
+        plt.figure(figsize=(5, 4))
+        plt.plot(fpr, tpr, label=f"test AUC={test_auc:.3f}")
+        plt.plot([0, 1], [0, 1], "k--", alpha=0.4)
+        plt.xlabel("False positive rate")
+        plt.ylabel("True positive rate")
+        plt.legend(loc="lower right")
+        roc_path = os.path.join(tmp, "roc_curve.png")
+        plt.savefig(roc_path, dpi=100, bbox_inches="tight")
+        plt.close()
+        bkt.blob(f"{prefix}/roc_curve.png").upload_from_filename(roc_path)
+    print(f"[train] uploaded {uri}model.joblib and roc_curve.png", flush=True)
 
 
 def explain(args) -> None:
