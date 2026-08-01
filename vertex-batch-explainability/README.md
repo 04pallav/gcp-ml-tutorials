@@ -15,27 +15,9 @@ Find the code and CSV file on my github account.
 
 [github.com/04pallav/gcp-ml-tutorials/vertex-batch-explainability](https://github.com/04pallav/gcp-ml-tutorials/tree/main/vertex-batch-explainability)
 
-# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs.png"> GCS
-
-Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO consumer credit dataset on OpenML](https://www.openml.org/d/45023) — 10,000 borrowers a lender might score and explain. Each row includes bureau features such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent.
-
-![image](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs-upload-instances.png)
-
-# <img width="40" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/vertex-ai.png"> `batch_explain.py`
-
-📖
-
-`batch_explain.py` code is a batch explainability pipeline implemented using scikit-learn and Vertex AI. It reads data from an input file, trains a classifier to estimate loan default risk, registers the model on Vertex AI with explanation settings, and writes predicted probabilities plus feature attributions to a BigQuery table.
-
 ## The model
 
-We train a **logistic regression** classifier on `heloc.csv` (10,000 labeled borrowers from the [FICO consumer credit dataset](https://www.openml.org/d/45023)).
-
-- **Input:** 22 credit-bureau features per borrower (e.g. `ExternalRiskEstimate`, `NumInqLast6M`, `MSinceMostRecentDelq`)
-- **Target:** `RiskPerformance` — **Bad (1)** = 90+ days past due at least once; **Good (0)** = paid as agreed
-- **Output:** `probability` — predicted risk of default (probability of class 1)
-
-The classifier is a scikit-learn **Pipeline** — three steps applied in order:
+`batch_explain.py` trains a scikit-learn **logistic regression** on `heloc.csv` (10,000 labeled borrowers from the [FICO consumer credit dataset](https://www.openml.org/d/45023)). It takes 22 credit-bureau features per borrower and predicts `probability` — the chance the borrower ends up 90+ days past due (`RiskPerformance` = Bad).
 
 ```mermaid
 flowchart LR
@@ -45,56 +27,65 @@ flowchart LR
     D --> E["P(default)"]
 ```
 
-On a re-run, if a Vertex model named `heloc-batch-explain` already exists, steps 3–5 are skipped and the script reuses it.
+The script has three steps you run one at a time — `load`, `train`, `explain` — so you can inspect the result of each before moving on. (You can also run `all` to do every step in sequence.)
 
-The pipeline consists of the following steps:
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs.png"> Step 1 — Upload the data to GCS
 
-1. Command-line arguments are parsed to specify your GCP project, GCS bucket, and input file.
-2. The data is read from the input file and loaded into the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
-3. The training data is read from `heloc.csv` and a scikit-learn pipeline is trained (median imputer → standard scaler → logistic regression).
-4. `model.joblib` and `feature_names.json` are uploaded to your GCS bucket.
-5. The model is registered on Vertex AI with explanation settings for all 22 input features.
-6. A batch prediction job reads from `heloc_batch_input`, scores each row, and writes predictions plus feature attributions to `heloc_batch_explanations`.
-7. The batch job is started, and the model and job resource names are printed to the console.
+Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO consumer credit dataset on OpenML](https://www.openml.org/d/45023) — 10,000 borrowers a lender might score and explain. Each row includes bureau features such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent.
 
-When you run the script, numbered progress lines appear in the shell:
+👩‍💻 `gsutil cp instances.csv gs://your-bucket/instances.csv`
 
-```
-[1] project=your-project-id bucket=gs://your-bucket/vertex-batch-explain instances=gs://your-bucket/instances.csv
-[2] Reading instances from gs://your-bucket/instances.csv
-[2] Loading 10000 rows to BigQuery table heloc_batch_input
-[2] Done — your-project-id.ml_explainability.heloc_batch_input
-[3] Training scikit-learn pipeline on heloc.csv
-[3] Done — model trained
-[4] Uploading model artifacts to gs://your-bucket/vertex-batch-explain/models/
-[4] Uploaded gs://your-bucket/vertex-batch-explain/models/model.joblib
-[4] Uploaded gs://your-bucket/vertex-batch-explain/models/feature_names.json
-[5] Registering model on Vertex AI with explanation settings
-[5] Done — projects/.../locations/us-central1/models/...
-[6] Starting batch prediction: heloc_batch_input → heloc_batch_explanations
-[7] Batch job started: projects/.../locations/us-central1/batchPredictionJobs/...
-[7] Model: projects/.../locations/us-central1/models/...
-```
+![Upload instances.csv to GCS](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs-upload-instances.png)
 
-👩‍💻
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcp.png"> Step 2 — Set up the cloud shell
 
-Set the project in the cloud shell: `gcloud config set project your-project-id`
+Set the project and install scikit-learn and the Vertex AI SDK.
 
-Install scikit-learn and the Vertex AI SDK in the cloud shell: `pip install google-cloud-aiplatform 'scikit-learn==1.6.*'`
+👩‍💻 `gcloud config set project your-project-id`
 
-Give the batch_explain.py code a test run in the shell and then check the results in BigQuery: `python batch_explain.py --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain --instances gs://your-bucket/instances.csv`
+👩‍💻 `pip install google-cloud-aiplatform 'scikit-learn==1.6.*'`
 
-❗ Make sure that all your files and services are in the same location. E.g. both buckets should be in the same location or you will get a similar error message: ‘Cannot read and write in different locations: source: US, destination: EU’
+![Cloud shell install](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step2-install.png)
 
-# 📊 BigQuery
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/bigquery.png"> Step 3 — Load the batch input into BigQuery
 
-Open BigQuery and check the input table:
+The `load` step reads `instances.csv` and writes it to the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
+
+👩‍💻 `python batch_explain.py load --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain --instances gs://your-bucket/instances.csv`
+
+Then inspect the rows in BigQuery:
 
 ```sql
 SELECT * FROM `your-project-id.ml_explainability.heloc_batch_input` LIMIT 10;
 ```
 
 You should see 10,000 rows from `instances.csv`.
+
+![heloc_batch_input in BigQuery](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step3-bq-input.png)
+
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/vertex-ai.png"> Step 4 — Train the model
+
+The `train` step fits the pipeline (median imputer → standard scaler → logistic regression) on `heloc.csv`, prints train/test ROC AUC, and uploads `model.joblib` + `feature_names.json` to your bucket.
+
+👩‍💻 `python batch_explain.py train --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain`
+
+Check the printed ROC AUC and confirm `model.joblib` landed in `gs://your-bucket/vertex-batch-explain/models/`.
+
+![Training output and model artifact](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step4-train.png)
+
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/vertex-ai.png"> Step 5 — Register the model and run the batch explanation job
+
+The `explain` step registers the model on Vertex AI with explanations enabled for all 22 features and starts a batch job that writes scores + attributions to `heloc_batch_explanations`. Re-running reuses the existing `heloc-batch-explain` model.
+
+👩‍💻 `python batch_explain.py explain --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain`
+
+❗ Make sure that all your files and services are in the same location. E.g. both buckets should be in the same location or you will get a similar error message: ‘Cannot read and write in different locations: source: US, destination: EU’
+
+Open **Vertex AI → Batch predictions** in the console and wait for **JOB_STATE_SUCCEEDED**.
+
+![Vertex AI batch prediction job](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step5-vertex-job.png)
+
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/bigquery.png"> Step 6 — Inspect the explanations in BigQuery
 
 After the batch job finishes, open the output table:
 
@@ -104,13 +95,13 @@ SELECT * FROM `your-project-id.ml_explainability.heloc_batch_explanations` LIMIT
 
 Each row has a prediction and **feature attributions** — how much each input feature pushed the score up or down for that borrower.
 
-# 🤖 Vertex AI
+![heloc_batch_explanations in BigQuery](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step6-bq-output.png)
 
-Open **Vertex AI → Batch predictions** in the console. Wait for **JOB_STATE_SUCCEEDED**.
-
-# 📈 Looker Studio
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/looker.png"> Step 7 — Visualize in Looker Studio
 
 Connect Looker Studio to `heloc_batch_explanations` and build a bar chart of top attributions per borrower.
+
+![Looker Studio dashboard](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step7-looker.png)
 
 ## About
 
