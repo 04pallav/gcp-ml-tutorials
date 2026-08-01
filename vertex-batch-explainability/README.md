@@ -65,11 +65,11 @@ Check the printed train/test ROC AUC in the terminal. The script also saves `tra
 
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/vertex-ai.png"> Step 5 — Run batch explanation job
 
-The `explain` step registers your model on Vertex AI, then starts a batch job that scores every row and writes feature attributions to BigQuery. Re-running reuses the existing `heloc-batch-explain` model.
+The `explain` step registers your model on Vertex AI, then starts a batch job that scores every row and writes feature attributions to BigQuery.
 
 **`Model.upload()` — register the model**
 
-Vertex loads `model.joblib` from GCS into Google's prebuilt sklearn container ([`sklearn-cpu.1-6`](https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers)) and attaches explanation settings:
+Vertex loads `model.joblib` from GCS into Google's prebuilt sklearn container ([`sklearn-cpu.1-6`](https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers)) and attaches explanation settings. See [Configure feature-based explanations](https://cloud.google.com/vertex-ai/docs/explainable-ai/configuring-explanations-feature-based) and [`ExplanationMetadata`](https://cloud.google.com/vertex-ai/docs/reference/rest/v1/ExplanationSpec#ExplanationMetadata) (`BAG_OF_FEATURES`, `index_feature_mapping`).
 
 ```python
 model = aiplatform.Model.upload(
