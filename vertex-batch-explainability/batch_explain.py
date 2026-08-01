@@ -14,9 +14,11 @@ import csv
 import io
 import json
 import os
+import subprocess
 import tempfile
 from math import isnan
 
+import google.auth
 import joblib
 from google.cloud import aiplatform, bigquery, storage
 from sklearn.impute import SimpleImputer
@@ -34,6 +36,27 @@ DATASET = "ml_explainability"
 INPUT_TABLE = "heloc_batch_input"
 OUTPUT_TABLE = "heloc_batch_explanations"
 MODEL_PREFIX = "models"
+
+
+def default_project() -> str:
+    if project := os.environ.get("GOOGLE_CLOUD_PROJECT"):
+        return project
+    _, project = google.auth.default()
+    if project:
+        return project
+    try:
+        out = subprocess.run(
+            ["gcloud", "config", "get-value", "project"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        if project := out.stdout.strip():
+            if project != "(unset)":
+                return project
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pass
+    raise SystemExit("No GCP project found — run: gcloud config set project YOUR_PROJECT_ID")
 
 
 def models_uri(bucket_uri: str) -> tuple[str, str]:
@@ -151,11 +174,15 @@ STEPS = {"load": load, "train": train, "explain": explain}
 
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("step", choices=[*STEPS, "all"], help="which step to run")
-parser.add_argument("--project-id", required=True)
-parser.add_argument("--bucket-uri", required=True, help="e.g. gs://your-bucket/vertex-batch-explain")
+parser.add_argument("--project-id", help="GCP project (defaults to gcloud config)")
+parser.add_argument("--bucket-uri", help="e.g. gs://your-bucket/vertex-batch-explain (train/explain only)")
 parser.add_argument("--region", default="us-central1")
 parser.add_argument("--instances", default="instances.csv", help="local path or gs:// URI")
 args = parser.parse_args()
+
+args.project_id = args.project_id or default_project()
+if args.step in ("train", "explain", "all") and not args.bucket_uri:
+    parser.error("--bucket-uri is required for train, explain, and all")
 
 aiplatform.init(project=args.project_id, location=args.region)
 

@@ -35,11 +35,9 @@ Set the project and install scikit-learn and the Vertex AI SDK.
 
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/bigquery.png"> Step 3 — Load the batch input into BigQuery
 
-`batch_explain.py` has three steps you run one at a time — `load`, `train`, `explain` — so you can inspect the result of each before moving on. (You can also run `all` to do every step in sequence.)
-
 The `load` step reads `instances.csv` and writes it to the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
 
-👨‍💻 `python batch_explain.py load --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain --instances gs://your-bucket/instances.csv`
+👨‍💻 `python batch_explain.py load --instances gs://your-bucket/instances.csv`
 
 Then inspect the rows in BigQuery:
 
@@ -57,7 +55,7 @@ You should see 10,000 rows from `instances.csv`.
 
 The `train` step fits the pipeline, prints train/test ROC AUC, and uploads `model.joblib` + `feature_names.json` to your bucket.
 
-👨‍💻 `python batch_explain.py train --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain`
+👨‍💻 `python batch_explain.py train --bucket-uri gs://your-bucket/vertex-batch-explain`
 
 Check the printed ROC AUC and confirm `model.joblib` landed in `gs://your-bucket/vertex-batch-explain/models/`.
 
@@ -67,7 +65,7 @@ Check the printed ROC AUC and confirm `model.joblib` landed in `gs://your-bucket
 
 The `explain` step registers the model on Vertex AI with explanations enabled for all 22 features and starts a batch job that writes scores + attributions to `heloc_batch_explanations`. Re-running reuses the existing `heloc-batch-explain` model.
 
-👨‍💻 `python batch_explain.py explain --project-id your-project-id --bucket-uri gs://your-bucket/vertex-batch-explain`
+👨‍💻 `python batch_explain.py explain --bucket-uri gs://your-bucket/vertex-batch-explain`
 
 ❗ Make sure that all your files and services are in the same location. E.g. both buckets should be in the same location or you will get a similar error message: ‘Cannot read and write in different locations: source: US, destination: EU’
 
