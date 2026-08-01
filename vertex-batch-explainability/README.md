@@ -19,8 +19,6 @@ Find the code and CSV file on my github account.
 
 Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO consumer credit dataset on OpenML](https://www.openml.org/d/45023) — 10,000 borrowers a lender might score and explain. Each row includes bureau features such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent.
 
-👨‍💻 `gsutil cp instances.csv gs://your-bucket/instances.csv`
-
 ![Upload instances.csv to GCS](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs-upload-instances.png)
 
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcp.png"> Step 2 — Set up the cloud shell
@@ -33,7 +31,7 @@ Set the project and install scikit-learn and the Vertex AI SDK.
 
 ![Cloud shell install](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/step2-install.png)
 
-# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/bigquery.png"> Step 3 — Load the batch input into BigQuery
+# <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/bigquery.png"> Step 3 — Load the data into BigQuery
 
 The `load` step reads `instances.csv` and writes it to the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
 
@@ -63,7 +61,27 @@ Check the printed ROC AUC and confirm `model.joblib` landed in `gs://your-bucket
 
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/vertex-ai.png"> Step 5 — Register the model and run the batch explanation job
 
-The `explain` step registers the model on Vertex AI with explanations enabled for all 22 features and starts a batch job that writes scores + attributions to `heloc_batch_explanations`. Re-running reuses the existing `heloc-batch-explain` model.
+The `explain` step does two things: register your model on Vertex AI, then start a batch job that scores every row and writes feature attributions to BigQuery. Re-running reuses the existing `heloc-batch-explain` model.
+
+**`Model.upload()` — register the model**
+
+Vertex loads `model.joblib` from GCS into Google's prebuilt sklearn container ([`sklearn-cpu.1-6`](https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers)) and attaches explanation settings.
+
+- `display_name` — name shown in the Vertex AI console (`heloc-batch-explain`)
+- `artifact_uri` — GCS path to `model.joblib` and `feature_names.json` from Step 4
+- `serving_container_image_uri` — Google's prebuilt sklearn 1.6 image that loads your artifact and serves predictions
+- `explanation_parameters` — how to explain: Sampled Shapley with `path_count=10` (10 random feature permutations per row)
+- `explanation_metadata` — maps the 22 input features to attributions; uses `BAG_OF_FEATURES` because BigQuery sends each row as a nameless array of 22 floats
+
+**`batch_predict()` — score + explain every row**
+
+- `job_display_name` — label for the job in Vertex AI → Batch predictions
+- `instances_format` / `bigquery_source` — read input rows from `heloc_batch_input`
+- `predictions_format` / `bigquery_destination_prefix` — write results to `heloc_batch_explanations`
+- `generate_explanation=True` — compute per-feature attributions, not just scores
+- `machine_type` — VM size for each prediction replica (`n2-standard-4`)
+- `batch_size` — rows processed per request to the model server (16)
+- `starting_replica_count` / `max_replica_count` — run on 1 replica (tutorial scale)
 
 👨‍💻 `python batch_explain.py explain --bucket-uri gs://your-bucket/vertex-batch-explain`
 

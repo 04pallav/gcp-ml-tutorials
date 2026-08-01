@@ -38,6 +38,18 @@ OUTPUT_TABLE = "heloc_batch_explanations"
 MODEL_PREFIX = "models"
 
 
+def explanation_metadata():
+    return aiplatform.explain.ExplanationMetadata(
+        inputs={
+            "input": {
+                "index_feature_mapping": FEATURE_NAMES,
+                "encoding": "BAG_OF_FEATURES",
+            },
+        },
+        outputs={"probability": {}},
+    )
+
+
 def default_project() -> str:
     if project := os.environ.get("GOOGLE_CLOUD_PROJECT"):
         return project
@@ -146,10 +158,7 @@ def explain(args) -> None:
             explanation_parameters=aiplatform.explain.ExplanationParameters(
                 {"sampled_shapley_attribution": {"path_count": 10}},
             ),
-            explanation_metadata=aiplatform.explain.ExplanationMetadata(
-                inputs={name: {} for name in FEATURE_NAMES},
-                outputs={"probability": {}},
-            ),
+            explanation_metadata=explanation_metadata(),
         )
         print(f"[explain] registered {vertex_model.resource_name}", flush=True)
 
