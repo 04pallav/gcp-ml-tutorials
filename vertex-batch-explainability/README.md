@@ -69,7 +69,7 @@ The `explain` step registers your model on Vertex AI, then starts a batch job th
 
 **`Model.upload()` — register the model**
 
-Vertex loads `model.joblib` from GCS into Google's prebuilt sklearn container ([`sklearn-cpu.1-6`](https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers)) and attaches explanation settings. See [Configure feature-based explanations](https://cloud.google.com/vertex-ai/docs/explainable-ai/configuring-explanations-feature-based#explanation-metadatajson) and [`ExplanationMetadata` `Encoding`](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding) — we use `BAG_OF_FEATURES` with `index_feature_mapping` because BigQuery batch rows are unnamed floats.
+Vertex loads `model.joblib` from GCS into Google's prebuilt sklearn container ([`sklearn-cpu.1-6`](https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers)) and attaches explanation settings. See [Configure feature-based explanations](https://cloud.google.com/vertex-ai/docs/explainable-ai/configuring-explanations-feature-based#explanation-metadatajson) and [`ExplanationMetadata` `Encoding`](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding).
 
 ```python
 model = aiplatform.Model.upload(
@@ -81,11 +81,19 @@ model = aiplatform.Model.upload(
     ),
     explanation_metadata=aiplatform.explain.ExplanationMetadata(
         inputs={"input": {"index_feature_mapping": FEATURES, "encoding": "BAG_OF_FEATURES"}},
-        # BAG_OF_FEATURES: BigQuery sends each row as 22 unnamed floats — map index → feature name
         outputs={"probability": {}},
     ),
 )
 ```
+
+**Why `BAG_OF_FEATURES` and `index_feature_mapping`?**
+
+BigQuery stores named columns (`ExternalRiskEstimate`, `NumInqLast6M`, …), but Vertex batch prediction sends each row to the model as an **ordered list of numbers** — like `[55, 144, 58, …]` with no labels attached. Google's docs call this a *tensor*; that just means a list of values in a fixed order, not TensorFlow.
+
+- **`encoding: "BAG_OF_FEATURES"`** — tells Vertex this input is a list of separate features packed together (see the [Encoding docs](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding): *"each index maps to a feature"*).
+- **`index_feature_mapping: FEATURES`** — the cheat sheet: position 0 → `ExternalRiskEstimate`, position 1 → `MSinceOldestTradeOpen`, and so on for all 22 features. Required for `BAG_OF_FEATURES` — same idea as Google's example `input = [27, 6.0, 150]` with `indexFeatureMapping = ["age", "height", "weight"]`.
+
+Without the mapping, Vertex can score the row but attributions come back as "position 14" instead of `NumInqLast6M`.
 
 **`batch_predict()` — score + explain every row**
 
