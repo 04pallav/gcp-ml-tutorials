@@ -88,7 +88,7 @@ model = aiplatform.Model.upload(
 
 See [ExplanationMetadata Encoding](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding).
 
-`explanation_parameters` picks how attributions are computed. `sampled_shapley_attribution` with `path_count: 10` estimates each feature's contribution by averaging over 10 random feature orderings (Shapley values). Higher `path_count` gives stabler attributions but costs more per row — 10 is a practical default for this tutorial.
+`explanation_parameters` picks how attributions are computed. `sampled_shapley_attribution` with `path_count: 10` estimates each feature's contribution by averaging over 10 random feature permutations (Shapley values). Higher `path_count` improves the approximation but costs more per row — we use 10 here to keep the tutorial job fast.
 
 **`batch_predict()` — score + explain every row**
 
