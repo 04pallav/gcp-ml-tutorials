@@ -1,6 +1,6 @@
-# <img width="40" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcp.png"> GCP ML Explainability: Batch Credit-Risk Scoring with Vertex AI, BigQuery and scikit-learn 🔍
+# <img width="40" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcp.png"> Predicting and Explaining Loan Default Risk with Vertex AI, BigQuery and scikit-learn 🔍
 
-This GCP ML project focuses on **batch explainability for credit-risk scoring** on Vertex AI. You train a scikit-learn classifier, register it on Vertex, and run one batch job that returns a prediction and per-feature attributions for each row in BigQuery.
+This GCP ML project focuses on **predicting and explaining loan default risk** on Vertex AI. You train a scikit-learn classifier on FICO consumer credit data, register it on Vertex, and run one batch job that returns each borrower's predicted default probability plus per-feature attributions in BigQuery.
 
 - <img width="18" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs.png"> GCS is used to store the sample input data
 - <img width="18" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/bigquery.png"> BigQuery holds the batch input rows and the explanation output table
@@ -9,13 +9,15 @@ This GCP ML project focuses on **batch explainability for credit-risk scoring** 
 
 These services work together to train the model, run batch explanations, and write results to BigQuery.
 
+![Architecture diagram](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/architecture-diagram.png)
+
 Find the code and CSV file on my github account.
 
 [github.com/04pallav/gcp-ml-tutorials/vertex-batch-explainability](https://github.com/04pallav/gcp-ml-tutorials/tree/main/vertex-batch-explainability)
 
 # <img width="30" alt="image" src="https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs.png"> GCS
 
-Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO HELOC dataset on OpenML](https://www.openml.org/d/45023) — 10,000 borrowers a lender might score and explain. It includes information such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent. The data showcases various credit-risk scenarios, providing valuable insights into payment history and utilization patterns banks review for home-equity credit lines.
+Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucket. This sample data comes from the [FICO consumer credit dataset on OpenML](https://www.openml.org/d/45023) — 10,000 borrowers a lender might score and explain. Each row includes bureau features such as `ExternalRiskEstimate`, `NumInqLast6M`, `NetFractionRevolvingBurden`, `MSinceMostRecentDelq`, and `PercentTradesNeverDelq` — outside risk score, recent credit applications, revolving utilization, months since last delinquency, and share of accounts never delinquent.
 
 ![image](https://github.com/04pallav/gcp-ml-tutorials/releases/download/readme-assets/gcs-upload-instances.png)
 
@@ -23,13 +25,13 @@ Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucke
 
 📖
 
-`batch_explain.py` code is a batch explainability pipeline implemented using scikit-learn and Vertex AI. It reads data from an input file, trains a credit-risk classifier on HELOC data, registers the model on Vertex AI with explanation settings, and writes predictions plus feature attributions to a BigQuery table.
+`batch_explain.py` code is a batch explainability pipeline implemented using scikit-learn and Vertex AI. It reads data from an input file, trains a classifier to estimate loan default risk, registers the model on Vertex AI with explanation settings, and writes predicted probabilities plus feature attributions to a BigQuery table.
 
 The pipeline consists of the following steps:
 
 1. Command-line arguments are parsed to specify your GCP project, GCS bucket, and input file.
 2. The data is read from the input file and loaded into the BigQuery table `heloc_batch_input` — one FLOAT column per feature.
-3. The HELOC training data is read from `heloc.csv` and a scikit-learn pipeline is trained (median imputer → standard scaler → logistic regression).
+3. The training data is read from `heloc.csv` and a scikit-learn pipeline is trained (median imputer → standard scaler → logistic regression).
 4. `model.joblib` and `feature_names.json` are uploaded to your GCS bucket.
 5. The model is registered on Vertex AI with explanation settings for all 22 input features.
 6. A batch prediction job reads from `heloc_batch_input`, scores each row, and writes predictions plus feature attributions to `heloc_batch_explanations`.
@@ -73,4 +75,4 @@ Connect Looker Studio to `heloc_batch_explanations` and build a bar chart of top
 
 ## About
 
-GCP ML explainability on HELOC credit-risk data — BigQuery in, predictions + feature attributions out.
+GCP ML explainability on consumer credit data — BigQuery in, default probabilities + feature attributions out.
