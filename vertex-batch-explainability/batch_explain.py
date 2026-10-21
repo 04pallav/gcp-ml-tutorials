@@ -9,14 +9,10 @@ import tempfile
 from math import isnan
 
 import google.auth
-import joblib
+import xgboost as xgb
 from google.cloud import aiplatform, bigquery, storage
-from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 
 # 22 credit-bureau features from the FICO HELOC dataset (OpenML 45023).
 FEATURES = [
@@ -43,11 +39,11 @@ FEATURES = [
     "NumBank2NatlTradesWHighUtilization",
     "PercentTradesWBalance",
 ]
-TARGET = "RiskPerformance"  # 1 = bad (90+ days past due), 0 = good
+TARGET = "RiskPerformance"  # 1 = good credit, 0 = bad (90+ days past due) in instances.csv
 # Blank cells in instances.csv; FICO raw data also uses -7/-8/-9 (see openml.org/d/45023).
 MISSING = {"", "-7", "-8", "-9"}
-CONTAINER = "us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-6:latest"
-MODEL_NAME = "heloc-batch-explain"
+CONTAINER = "us-docker.pkg.dev/vertex-ai/prediction/xgboost-cpu.2-1:latest"
+MODEL_NAME = "heloc-batch-explain-xgb"
 DATASET = "ml_explainability"
 INPUT_TABLE = "heloc_batch_input"
 OUTPUT_TABLE = "heloc_batch_explanations"
@@ -97,18 +93,18 @@ def load(args) -> None:
 
 
 def train(args) -> None:
-    """Step 4 — fit logistic regression and upload model.joblib to GCS."""
+    """Step 4 — fit XGBoost (binary:logistic) and upload model.bst to GCS."""
     rows = read_csv(args.instances)
     X = [[parse_float(r[n]) for n in FEATURES] for r in rows]  # feature matrix
-    y = [int(r[TARGET].strip() == "1") for r in rows]  # 1 = bad, 0 = good
+    y = [int(r[TARGET].strip() == "1") for r in rows]  # 1 = good, 0 = bad
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
-    model = Pipeline([
-        ("imputer", SimpleImputer(strategy="median")),  # fill NaN from blank cells
-        ("scaler", StandardScaler()),
-        ("clf", LogisticRegression(max_iter=1000, class_weight="balanced")),
-    ]).fit(X_train, y_train)
+    # Vertex's xgboost container serves Booster.predict(), which returns P(y=1) for binary:logistic.
+    model = xgb.XGBClassifier(
+        objective="binary:logistic",  # NaN is handled natively, no imputer needed
+        scale_pos_weight=y_train.count(0) / y_train.count(1),  # balance classes
+    ).fit(X_train, y_train)
     y_score = model.predict_proba(X_test)[:, 1]
     test_auc = roc_auc_score(y_test, y_score)
     train_auc = roc_auc_score(y_train, model.predict_proba(X_train)[:, 1])
@@ -117,25 +113,25 @@ def train(args) -> None:
     bucket, uri = model_uri(args.bucket_uri)
     prefix = uri.removeprefix(f"gs://{bucket}/").rstrip("/")
     with tempfile.TemporaryDirectory() as tmp:
-        model_path = os.path.join(tmp, "model.joblib")
-        joblib.dump(model, model_path)
+        model_path = os.path.join(tmp, "model.bst")
+        model.get_booster().save_model(model_path)
         bkt = storage.Client().bucket(bucket)
-        bkt.blob(f"{prefix}/model.joblib").upload_from_filename(model_path)
+        bkt.blob(f"{prefix}/model.bst").upload_from_filename(model_path)
 
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         from sklearn.metrics import roc_curve
 
-        coefs = model.named_steps["clf"].coef_[0]
-        order = sorted(range(len(FEATURES)), key=lambda i: abs(coefs[i]), reverse=True)
+        importances = model.feature_importances_
+        order = sorted(range(len(FEATURES)), key=lambda i: importances[i], reverse=True)
         names = [FEATURES[i] for i in order]
-        values = [coefs[i] for i in order]
+        values = [importances[i] for i in order]
 
         fig, (ax_coef, ax_roc) = plt.subplots(1, 2, figsize=(12, 8))
-        ax_coef.barh(names, values, color=["#c44" if v > 0 else "#48c" for v in values])
-        ax_coef.set_xlabel("Coefficient (scaled features)")
-        ax_coef.set_title("Logistic regression")
+        ax_coef.barh(names, values, color="#48c")
+        ax_coef.set_xlabel("Feature importance")
+        ax_coef.set_title("XGBoost")
         ax_coef.invert_yaxis()
 
         fpr, tpr, _ = roc_curve(y_test, y_score)
@@ -151,7 +147,7 @@ def train(args) -> None:
         fig.savefig(plot_path, dpi=100, bbox_inches="tight")
         plt.close(fig)
         bkt.blob(f"{prefix}/train_metrics.png").upload_from_filename(plot_path)
-    print(f"[train] uploaded {uri}model.joblib and train_metrics.png", flush=True)
+    print(f"[train] uploaded {uri}model.bst and train_metrics.png", flush=True)
 
 
 def explain(args) -> None:

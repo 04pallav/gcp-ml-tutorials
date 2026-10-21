@@ -1,6 +1,6 @@
-# <img width="40" alt="image" src="docs/assets/gcp.png"> GCP ML Project: Explaining Loan Default Risk Predictions with Vertex AI, BigQuery and scikit-learn 🔍
+# <img width="40" alt="image" src="docs/assets/gcp.png"> GCP ML Project: Explaining Loan Default Risk Predictions with Vertex AI, BigQuery and XGBoost 🔍
 
-This GCP ML project focuses on **explaining loan default risk predictions** on Vertex AI. You train a scikit-learn classifier on FICO consumer credit data, register it on Vertex, and run one batch job that returns each borrower's predicted default probability plus per-feature attributions in BigQuery.
+This GCP ML project focuses on **explaining loan default risk predictions** on Vertex AI. You train an XGBoost classifier on FICO consumer credit data, register it on Vertex, and run one batch job that returns each borrower's predicted probability (of `RiskPerformance` = 1, good credit) plus per-feature attributions in BigQuery.
 
 - <img width="18" alt="image" src="docs/assets/gcs.png"> GCS is used to store the sample input data
 - <img width="18" alt="image" src="docs/assets/bigquery.png"> BigQuery holds the batch input rows and the explanation output table
@@ -23,11 +23,11 @@ Upload the provided CSV file to your designated Google Cloud Storage (GCS) bucke
 
 # <img width="30" alt="image" src="docs/assets/gcp.png"> Step 2 — Set up cloud shell
 
-Set the project and install scikit-learn and the Vertex AI SDK.
+Set the project and install XGBoost, scikit-learn and the Vertex AI SDK.
 
 👨‍💻 `gcloud config set project your-project-id`
 
-👨‍💻 `pip install google-cloud-aiplatform 'scikit-learn==1.6.*' matplotlib`
+👨‍💻 `pip install google-cloud-aiplatform 'scikit-learn==1.6.*' 'xgboost==2.1.*' matplotlib`
 
 ![Cloud shell install](docs/assets/step2-install.png)
 
@@ -49,19 +49,21 @@ You should see 10,000 rows from `instances.csv`.
 
 # <img width="30" alt="image" src="docs/assets/vertex-ai.png"> Step 4 — Train model
 
-The `train()` method in `batch_explain.py` fits a scikit-learn **logistic regression** on `instances.csv`. We predict `probability` — the chance the borrower ends up 90+ days past due (`RiskPerformance` = Bad).
+The `train()` method in `batch_explain.py` fits an **XGBoost** classifier (`binary:logistic`) on `instances.csv`. We predict `probability` — the chance that `RiskPerformance` = 1. In this CSV `1` is good credit (that group has the higher average `ExternalRiskEstimate`) and `0` is bad (90+ days past due), so a low probability means higher default risk.
 
-The `train` step fits the pipeline and uploads `model.joblib` and `train_metrics.png` to your bucket.
+We use XGBoost because Vertex's prebuilt XGBoost container serves `Booster.predict()`, which returns that probability. The prebuilt scikit-learn container calls `.predict()` instead, which returns a 0/1 class label for a classifier, so the explanations would attribute a label rather than a probability.
+
+The `train` step fits the model and uploads `model.bst` and `train_metrics.png` to your bucket.
 
 👨‍💻 `python batch_explain.py train --bucket-uri gs://your-bucket/vertex-batch-explain`
 
-Confirm `model.joblib` landed in `gs://your-bucket/vertex-batch-explain/models/`.
+Confirm `model.bst` landed in `gs://your-bucket/vertex-batch-explain/models/`.
 
-![model.joblib in GCS](docs/assets/step4-train.png)
+![model.bst in GCS](docs/assets/step4-train.png)
 
-Check the printed train/test ROC AUC in the terminal. The script also saves `train_metrics.png` to the same folder — logistic regression **coefficients** on the left (which features push risk up or down) and the test-set **ROC curve** on the right.
+Check the printed train/test ROC AUC in the terminal. The script also saves `train_metrics.png` to the same folder — XGBoost **feature importances** on the left (which features the model relies on most) and the test-set **ROC curve** on the right.
 
-![Logistic regression coefficients and ROC curve](docs/assets/step4-roc.png)
+![XGBoost feature importances and ROC curve](docs/assets/step4-roc.png)
 
 # <img width="30" alt="image" src="docs/assets/vertex-ai.png"> Step 5 — Run batch explanation job
 
@@ -71,9 +73,9 @@ The `explain` step registers your model on Vertex AI, then starts a batch job th
 
 ```python
 model = aiplatform.Model.upload(
-    display_name="heloc-batch-explain",  # name shown in the Vertex AI console
-    artifact_uri=uri,  # GCS path to model.joblib from Step 4
-    serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-6:latest",
+    display_name="heloc-batch-explain-xgb",  # name shown in the Vertex AI console
+    artifact_uri=uri,  # GCS path to model.bst from Step 4
+    serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/xgboost-cpu.2-1:latest",
     explanation_parameters=aiplatform.explain.ExplanationParameters(
         {"sampled_shapley_attribution": {"path_count": 10}},  # Sampled Shapley: 10 permutations per row
     ),
@@ -84,7 +86,7 @@ model = aiplatform.Model.upload(
 )
 ```
 
-`Model.upload()` registers the model on Vertex AI — GCS artifact + sklearn serving container + explanation settings. Batch prediction sends each row as a fixed-order list (`[55, 144, 58, …]`), so `BAG_OF_FEATURES` and `index_feature_mapping` tell Vertex which index maps to which feature name in the attributions.
+`Model.upload()` registers the model on Vertex AI — GCS artifact + XGBoost serving container + explanation settings. Batch prediction sends each row as a fixed-order list (`[55, 144, 58, …]`), so `BAG_OF_FEATURES` and `index_feature_mapping` tell Vertex which index maps to which feature name in the attributions.
 
 See [ExplanationMetadata Encoding](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/rest/v1/ExplanationSpec#Encoding).
 
