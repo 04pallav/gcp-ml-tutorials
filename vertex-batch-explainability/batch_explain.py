@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Vertex batch explainability — load, train, explain (or `all`)."""
+"""Vertex batch explainability — load, train, explain (or `all`), then plot one borrower."""
 
 import argparse
 import csv
 import io
+import json
 import os
 import tempfile
 from math import isnan
@@ -190,9 +191,83 @@ def explain(args) -> None:
     print(f"[explain] job started: {job.resource_name}", flush=True)
 
 
+def plot(args) -> None:
+    """Step 6 — waterfall chart of one borrower's attributions, uploaded to GCS."""
+    sql = f"""
+        SELECT * FROM `{args.project_id}.{DATASET}.{OUTPUT_TABLE}`
+        ORDER BY CAST(prediction AS FLOAT64) DESC LIMIT 1
+    """
+    row = dict(next(iter(bigquery.Client(project=args.project_id).query(sql).result())))
+    attribution = json.loads(row["explanation"])["attributions"][0]
+    base, final = attribution["baselineOutputValue"], attribution["instanceOutputValue"]
+    # Smallest contributions first: the waterfall is drawn from the bottom (baseline) to the top.
+    ranked = sorted(
+        (kv for kv in attribution["featureAttributions"].items() if kv[1][0]),
+        key=lambda kv: abs(kv[1][0]),
+    )
+    rest, shown = ranked[:-8], ranked[-8:]
+    bars = [(f"{'missing' if row[name] is None else format(row[name], 'g')} = {name}", v[0])
+            for name, v in shown]
+    if rest:
+        bars.insert(0, (f"{len(rest)} other features", sum(v[0] for _, v in rest)))
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Polygon
+
+    red, blue, gray = "#ff0051", "#008bfb", "#777777"  # SHAP's default colors
+    path = [base]  # running total after each bar
+    for _, v in bars:
+        path.append(path[-1] + v)
+    span = (max(path) - min(path)) or 1
+    lo, hi = min(path) - 0.1 * span, max(path) + 0.15 * span  # zoom to the data, room for labels
+    tip = (hi - lo) * 0.012  # arrow tip length
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+    start = base
+    for i, (_, v) in enumerate(bars, start=1):
+        end = start + v
+        d = tip if v > 0 else -tip
+        body_end = end - d if abs(v) > tip else start
+        ax.add_patch(Polygon(
+            [(start, i - 0.3), (body_end, i - 0.3), (end, i), (body_end, i + 0.3), (start, i + 0.3)],
+            color=red if v > 0 else blue,
+        ))
+        ax.plot([start, start], [i - 0.7, i - 0.3], color=gray, lw=0.8, ls=":")
+        ax.text(max(start, end) + 0.006, i, f"{v:+.3f}", va="center",
+                color=red if v > 0 else blue, fontweight="bold")
+        start = end
+    top = len(bars) + 1
+    ax.plot([start, start], [top - 0.7, top - 0.3], color=gray, lw=0.8, ls=":")
+    ax.axvline(base, color=gray, lw=0.8, ls="--")
+    ax.axvline(final, color=gray, lw=0.8, ls="--")
+    ax.text(base, 0.12, f"E[f(X)] = {base:.3f}", ha="center", va="center", color=gray,
+            bbox=dict(facecolor="white", edgecolor="none", pad=1.5))
+    ax.text(final, top - 0.3, f"f(x) = {final:.3f}", ha="center", va="bottom", fontweight="bold")
+    ax.set_yticks(range(1, len(bars) + 1))
+    ax.set_yticklabels([name for name, _ in bars])
+    ax.set_ylim(-0.1, top + 0.4)
+    ax.set_xlim(lo, hi)
+    ax.set_xlabel("Probability (RiskPerformance = 1, good credit)", labelpad=24)
+    for side in ("top", "right", "left"):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(axis="y", length=0)
+    fig.tight_layout()
+
+    bucket, uri = model_uri(args.bucket_uri)
+    prefix = uri.removeprefix(f"gs://{bucket}/").rstrip("/")
+    with tempfile.TemporaryDirectory() as tmp:
+        plot_path = os.path.join(tmp, "attribution_example.png")
+        fig.savefig(plot_path, dpi=100, bbox_inches="tight")
+        storage.Client().bucket(bucket).blob(f"{prefix}/attribution_example.png").upload_from_filename(plot_path)
+    plt.close(fig)
+    print(f"[plot] baseline {base:.3f} + attributions {start - base:+.3f} = {start:.3f}; "
+          f"uploaded {uri}attribution_example.png", flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("step", choices=["load", "train", "explain", "all"])
+    parser.add_argument("step", choices=["load", "train", "explain", "plot", "all"])
     parser.add_argument("--project-id")
     parser.add_argument("--bucket-uri")
     parser.add_argument("--region", default="us-central1")
@@ -203,12 +278,13 @@ def main() -> None:
     args.project_id = args.project_id or default_project
     if not args.project_id:
         parser.error("Pass --project-id or run: gcloud config set project YOUR_PROJECT_ID")
-    if args.step in ("train", "explain", "all") and not args.bucket_uri:
-        parser.error("--bucket-uri required for train/explain/all")
+    if args.step in ("train", "explain", "plot", "all") and not args.bucket_uri:
+        parser.error("--bucket-uri required for train/explain/plot/all")
 
     aiplatform.init(project=args.project_id, location=args.region)
-    steps = {"load": load, "train": train, "explain": explain}
-    for fn in steps.values() if args.step == "all" else [steps[args.step]]:
+    steps = {"load": load, "train": train, "explain": explain, "plot": plot}
+    # `all` stops after explain: plot needs the batch job to have finished.
+    for fn in [load, train, explain] if args.step == "all" else [steps[args.step]]:
         fn(args)
 
 

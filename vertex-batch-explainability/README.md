@@ -5,7 +5,6 @@ This GCP ML project focuses on **explaining loan default risk predictions** on V
 - <img width="18" alt="image" src="docs/assets/gcs.png"> GCS is used to store the sample input data
 - <img width="18" alt="image" src="docs/assets/bigquery.png"> BigQuery holds the batch input rows and the explanation output table
 - <img width="18" alt="image" src="docs/assets/vertex-ai.png"> Vertex AI uploads the model and runs batch prediction with explanations enabled
-- <img width="18" alt="image" src="docs/assets/looker.png"> Looker Studio connects to the output table for dashboards
 
 These services work together to train the model, run batch explanations, and write results to BigQuery.
 
@@ -127,12 +126,14 @@ Each row has a prediction and **feature attributions** — how much each input f
 
 ![heloc_batch_explanations in BigQuery](docs/assets/step6-bq-output.png?v=36ee22d)
 
-# <img width="30" alt="image" src="docs/assets/looker.png"> Step 7 — Visualize in Looker Studio
+The `explanation` column holds the attributions as JSON. To see them for one borrower, the `plot` step reads the borrower with the highest predicted probability from `heloc_batch_explanations`, draws a waterfall chart, and uploads it to your bucket as `attribution_example.png`.
 
-Connect Looker Studio to `heloc_batch_explanations` and build a bar chart of top attributions per borrower.
+👨‍💻 `python batch_explain.py plot --bucket-uri gs://your-bucket/vertex-batch-explain`
 
-![Looker Studio dashboard](docs/assets/step7-looker.png)
+![Waterfall chart of one borrower's feature attributions](docs/assets/step6-waterfall.png?v=waterfall1)
+
+Read the chart from the bottom up. It starts at `E[f(X)]`, the baseline prediction, and each bar moves the probability by one feature's attribution — red pushes it up, blue pushes it down — until it reaches `f(x)`, this borrower's prediction. The baseline plus all the attributions equals the prediction. The number before each feature name is this borrower's value for it, and the smallest features are grouped into one row.
 
 ## About
 
-GCP ML explainability on consumer credit data — BigQuery in, default probabilities + feature attributions out.
+GCP ML explainability on consumer credit data — BigQuery in, probabilities + feature attributions out.
