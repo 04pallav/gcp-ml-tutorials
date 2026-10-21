@@ -29,8 +29,6 @@ Set the project and install XGBoost, scikit-learn and the Vertex AI SDK.
 
 👨‍💻 `pip install google-cloud-aiplatform 'scikit-learn==1.6.*' 'xgboost==2.1.*' matplotlib`
 
-![Cloud shell install](docs/assets/step2-install.png)
-
 # <img width="30" alt="image" src="docs/assets/bigquery.png"> Step 3 — Load data to BigQuery
 
 The `load` step reads `instances.csv` and writes the 22 feature columns to BigQuery table `heloc_batch_input` (the `RiskPerformance` label stays in the CSV but is not loaded into BigQuery).
