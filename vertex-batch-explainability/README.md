@@ -113,7 +113,7 @@ job = model.batch_predict(
 
 Open **Vertex AI → Batch predictions** in the console and wait for **JOB_STATE_SUCCEEDED**.
 
-![Vertex AI batch prediction job](docs/assets/step5-vertex-job.png)
+![Vertex AI batch prediction job](docs/assets/step5-vertex-job.png?v=717beb4)
 
 # <img width="30" alt="image" src="docs/assets/bigquery.png"> Step 6 — Inspect the explanations in BigQuery
 
