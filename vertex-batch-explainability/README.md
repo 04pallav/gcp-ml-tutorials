@@ -8,7 +8,7 @@ This GCP ML project focuses on **explaining loan default risk predictions** on V
 
 These services work together to train the model, run batch explanations, and write results to BigQuery.
 
-![Architecture diagram](docs/assets/architecture-diagram.png)
+![Architecture diagram](docs/assets/architecture-diagram.png?v=xgboost1)
 
 Find the code and CSV file on my github account.
 
