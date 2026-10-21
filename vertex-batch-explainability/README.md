@@ -57,11 +57,11 @@ The `train` step fits the model and uploads `model.bst` and `train_metrics.png` 
 
 Confirm `model.bst` landed in `gs://your-bucket/vertex-batch-explain/models/`.
 
-![model.bst in GCS](docs/assets/step4-train.png)
+![model.bst in GCS](docs/assets/step4-train.png?v=36ee22d)
 
 Check the printed train/test ROC AUC in the terminal. The script also saves `train_metrics.png` to the same folder — XGBoost **feature importances** on the left (which features the model relies on most) and the test-set **ROC curve** on the right.
 
-![XGBoost feature importances and ROC curve](docs/assets/step4-roc.png)
+![XGBoost feature importances and ROC curve](docs/assets/step4-roc.png?v=36ee22d)
 
 # <img width="30" alt="image" src="docs/assets/vertex-ai.png"> Step 5 — Run batch explanation job
 
@@ -125,7 +125,7 @@ SELECT * FROM `your-project-id.ml_explainability.heloc_batch_explanations` LIMIT
 
 Each row has a prediction and **feature attributions** — how much each input feature pushed the score up or down for that borrower.
 
-![heloc_batch_explanations in BigQuery](docs/assets/step6-bq-output.png)
+![heloc_batch_explanations in BigQuery](docs/assets/step6-bq-output.png?v=36ee22d)
 
 # <img width="30" alt="image" src="docs/assets/looker.png"> Step 7 — Visualize in Looker Studio
 
